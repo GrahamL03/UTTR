@@ -1,8 +1,8 @@
 # UTTR // NOVI
 
-## Unified Table Tennis Rankings & Tournament Management System
+## Universal Table Tennis Rankings & Tournament Management System
 
-UTTR (Unified Table Tennis Rankings) is a professional-grade league management platform developed for Detroit Catholic Central. It utilizes the **Glicko-2** rating system—the same mathematical framework used by competitive chess and professional esports—to provide highly accurate skill assessment, automated tournament seeding, and longitudinal performance tracking.
+UTTR (Universal Table Tennis Rankings) is a professional-grade league management platform developed for Detroit Catholic Central. It utilizes the **Glicko-2** rating system—the same mathematical framework used by competitive chess and professional esports—to provide highly accurate skill assessment, automated tournament seeding, and longitudinal performance tracking.
 
 ---
 
