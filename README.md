@@ -2,7 +2,7 @@ Universal Table Tennis Rating
 Based off of UTR (Universal Tennis Rating)
 
 ## Quick Start
-1. Clone the repo: `git clone https://github.com/yourusername/uttr.git`
+1. Clone the repo: `git clone https://github.com/GrahamL03/uttr.git`
 2. Install dependencies: `pip install -r requirements.txt`
 3. Launch the hub: `streamlit run app.py`
 
