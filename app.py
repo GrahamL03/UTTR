@@ -106,11 +106,11 @@ with st.sidebar:
 st.markdown(f'<div class="header-section"><p class="sub-title">Detroit Catholic Central</p><p class="main-title">UTTR</p></div>', unsafe_allow_html=True)
 
 # --- 6. NAVIGATION LOGIC ---
-
 if menu == "STANDINGS":
     st.markdown("#### LEAGUE TABLE")
     sorted_players = sorted(club.players.items(), key=lambda x: x[1].rating, reverse=True)
-    top_3_names = [x[0] for x in sorted_players[:3]]
+    # Changed top_3_names to top_3 to match your badge logic below
+    top_3 = [x[0] for x in sorted_players[:3]]
     players_data = []
 
     for i, (name, p) in enumerate(sorted_players):
@@ -127,17 +127,18 @@ if menu == "STANDINGS":
                 else:
                     form_str += "L "; l_streak += 1; streak = 0
             
-            if i == 0: badges.append("🥇 CHAMP")                  # 1. Rank 1
-            if streak >= 3: badges.append("🔥 ON FIRE")          # 2. 3 Wins
-            if streak >= 5: badges.append("👑 UNSTOPPABLE")       # 3. 5 Wins
-            if l_streak >= 3: badges.append("🧊 COLD")             # 4. 3 Losses
-            if p.rd < 50: badges.append("🛡️ WALL")                # 5. Stability > 85%
-            if len(p_matches) >= 50: badges.append("💎 VETERAN")  # 6. 50+ Games
-            if len(p_matches) < 5: badges.append("🐣 ROOKIE")     # 7. < 5 Games
+            # --- BADGE LOGIC ---
+            if i == 0: badges.append("🥇 CHAMP")
+            if streak >= 3: badges.append("🔥 ON FIRE")
+            if streak >= 5: badges.append("👑 UNSTOPPABLE")
+            if l_streak >= 3: badges.append("🧊 COLD")
+            if p.rd < 50: badges.append("🛡️ WALL")
+            if len(p_matches) >= 50: badges.append("💎 VETERAN")
+            if len(p_matches) < 5: badges.append("🐣 ROOKIE")
             if not last_5.empty and last_5.iloc[-1]['Winner'] == name and last_5.iloc[-1]['Loser'] in top_3 and name not in top_3:
-                badges.append("🔨 SLAYER")                        # 8. Beat Top 3
-            if p.rd > 120: badges.append("❓ UNKNOWN")            # 9. Low Stability
-            if "W W W W W" in form_str: badges.append("⚡ RAID")  # 10. Perfect Recent Form
+                badges.append("🔨 SLAYER")
+            if p.rd > 120: badges.append("❓ UNKNOWN")
+            if "W W W W W" in form_str: badges.append("⚡ RAID")
 
         players_data.append({
             "RK": i + 1,
@@ -148,9 +149,24 @@ if menu == "STANDINGS":
             "STABILITY": f"{int(100 - (p.rd/3.5))}%"
         })
 
-    st.dataframe(pd.DataFrame(players_data), use_container_width=True, hide_index=True,
-                 column_config={"RATING": st.column_config.ProgressColumn("RATING", min_value=1000, max_value=2000, format="%d")})
+    # --- RENDER (Outside the for-loop) ---
+    st.dataframe(
+        pd.DataFrame(players_data), 
+        use_container_width=True, 
+        hide_index=True,
+        column_config={
+            "RATING": st.column_config.ProgressColumn(
+                "RATING", min_value=1000, max_value=2000, format="%d"
+            )
+        }
+    )
 
+    st.markdown("---")
+    st.caption("LEAGUE RATING DISTRIBUTION")
+    all_ratings = [int(p.rating) for p in club.players.values()]
+    if all_ratings:
+        rating_counts = pd.Series(all_ratings).value_counts().sort_index()
+        st.bar_chart(rating_counts)
 elif menu == "TOURNAMENT":
     st.markdown("#### 🏆 BRACKET CONTROL")
     if st.session_state.bracket is None:
@@ -241,19 +257,61 @@ elif menu == "PLAYER INTEL":
     st.markdown("#### SUBJECT DOSSIER")
     name = st.selectbox("IDENTIFY", sorted(list(club.players.keys())))
     p = club.players[name]
-    st.metric("RATING", int(p.rating), delta=f"{int(p.rd)} RD")
-    if not h_df.empty:
-        p_matches = h_df[(h_df['Winner'] == name) | (h_df['Loser'] == name)]
-        st.write(f"RECORD: {len(p_matches[p_matches['Winner'] == name])}W - {len(p_matches[p_matches['Loser'] == name])}L")
+    
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.metric("CURRENT RATING", int(p.rating), delta=f"{int(p.rd)} RD")
+        if not h_df.empty:
+            p_matches = h_df[(h_df['Winner'] == name) | (h_df['Loser'] == name)]
+            wins = len(p_matches[p_matches['Winner'] == name])
+            losses = len(p_matches[p_matches['Loser'] == name])
+            st.write(f"**RECORD:** {wins}W - {losses}L")
+            if (wins + losses) > 0:
+                st.write(f"**WIN RATE:** {int((wins/(wins+losses))*100)}%")
+
+    with col2:
+        st.caption("RATING PROGRESSION")
+        # Logic to build a timeline of ratings for this player
+        if not h_df.empty:
+            # Filter matches for this player and sort by date
+            personal_history = h_df[(h_df['Winner'] == name) | (h_df['Loser'] == name)].copy()
+            
+            # Since we don't store historical rating in h_df yet, 
+            # this chart will show match frequency/activity for now.
+            # PRO TIP: To show a true line chart, you'd need to re-calculate 
+            # the rating step-by-step from the start of the history.
+            personal_history['Match_Count'] = range(1, len(personal_history) + 1)
+            st.line_chart(personal_history.set_index('Date')['Match_Count'])
 
 elif menu == "VERSUS":
     st.markdown("#### MATCHUP ANALYSIS")
-    p1_n = st.selectbox("A", sorted(list(club.players.keys())))
-    p2_n = st.selectbox("B", sorted([x for x in club.players.keys() if x != p1_n]))
+    p1_n = st.selectbox("PLAYER A", sorted(list(club.players.keys())))
+    p2_n = st.selectbox("PLAYER B", sorted([x for x in club.players.keys() if x != p1_n]))
+    
     p1, p2 = club.players[p1_n], club.players[p2_n]
     prob = 1 / (1 + math.pow(10, ((p2.rating - p1.rating) / 400)))
-    st.write(f"**{p1_n}** has a {int(prob*100)}% chance to win.")
+    
+    # Visual Probability Bar
+    st.write(f"**{p1_n}** has a **{int(prob*100)}%** predicted chance to win.")
     st.progress(prob)
+    
+    # Head-to-Head Stats
+    if not h_df.empty:
+        h2h = h_df[((h_df['Winner'] == p1_n) & (h_df['Loser'] == p2_n)) | 
+                   ((h_df['Winner'] == p2_n) & (h_df['Loser'] == p1_n))]
+        
+        p1_h2h_wins = len(h2h[h2h['Winner'] == p1_n])
+        p2_h2h_wins = len(h2h[h2h['Winner'] == p2_n])
+        
+        st.markdown("---")
+        st.caption("HEAD-TO-HEAD HISTORY")
+        
+        chart_data = pd.DataFrame({
+            "Player": [p1_n, p2_n],
+            "Wins": [p1_h2h_wins, p2_h2h_wins]
+        })
+        st.bar_chart(chart_data.set_index("Player"))
 
 st.markdown('<div class="floating-legend">', unsafe_allow_html=True)
 with st.popover("📜 STATUS KEY"):
