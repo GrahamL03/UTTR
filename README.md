@@ -1,15 +1,3 @@
-title: UTTR Novi
-emoji: 🏓
-colorFrom: blue
-colorTo: gray
-sdk: streamlit
-sdk_version: 1.31.0
-app_file: app.py
-pinned: false
-license: mit
-
-
-
 # UTTR // NOVI
 
 ## Unified Table Tennis Rankings & Tournament Management System
