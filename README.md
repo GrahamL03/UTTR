@@ -1,38 +1,63 @@
-Universal Table Tennis Rating
-Based off of UTR (Universal Tennis Rating)
+Gemini said
+UTTR // NOVI
+Professional Table Tennis Ranking and Tournament Management System
+UTTR (Unified Table Tennis Rankings) is a sophisticated league management platform developed for Detroit Catholic Central. It utilizes the Glicko-2 rating system—the same mathematical framework used by competitive chess and professional esports—to provide highly accurate skill assessment, automated tournament seeding, and longitudinal performance tracking.
 
-## Quick Start
-1. Clone the repo: `git clone https://github.com/GrahamL03/uttr.git`
-2. Install dependencies: `pip install -r requirements.txt`
-3. Launch the hub: `streamlit run app.py`
+Technical Architecture
+The system is built on a high-concurrency, cloud-synchronized architecture:
 
- # System Features
-## Advanced Rating Engine
-Glicko-2 Implementation: Uses the industry-standard Glicko-2 algorithm for high-accuracy skill assessment.
+Logic Engine: Implementation of the Glicko-2 algorithm, accounting for Rating Deviation (RD) and Volatility (σ).
 
-Dynamic Volatility Tracking: The system calculates "Rating Deviation" (RD) to determine how stable or "certain" a player's rank is.
+Data Layer: Real-time integration with Google Sheets via st.connection, serving as a distributed database.
 
-Point-Spread Sensitivity: Match updates factor in the margin of victory (e.g., an 11-0 shutout impacts ratings differently than an 11-9 nail-biter).
+Interface: Streamlit-driven SPA (Single Page Application) with custom CSS injection for high-contrast, low-latency navigation.
 
-## Tactical User Interface
-Forced Dark-Mode Aesthetics: A custom-coded "Onyx & Ombre" interface designed for high-contrast data readability.
+Predictive Modeling: Logistic distribution functions used to calculate win probabilities for any given matchup.
 
-Glassmorphism UI Elements: Modern, semi-transparent metric cards for displaying Elo, Win/Loss records, and Stability percentages.
+Core Functionality
+1. Competitive Rating System
+Unlike traditional Elo systems, UTTR measures three distinct variables for every player:
 
-Top-Tier Navigation: A streamlined sidebar for quick switching between the global leaderboard and individual player dossiers.
+Rating: The estimated skill level (standardized at 1500 for new subjects).
 
-## Intelligence & Analytics
-Predictive Win Probability: Real-time calculation of win chances between any two players using Glicko-2 mathematical curves.
+Rating Deviation (RD): The degree of certainty the system has in a player's rank. High RD indicates "Unknown" status; low RD indicates a "Stable" rank.
 
-Performance Evolution Graphs: Interactive line charts that visualize a player's rating journey and "climb" through the ranks.
+Volatility: The degree of expected fluctuation in a player's performance.
 
-Live Form Guide: Instant "Last 5" match tracking (W-L-W-W-L) to identify who is currently on a "heater."
+2. Tournament Bracket Control
+The system features an automated 8-man bracket generator. Matches are seeded to ensure competitive integrity:
 
-Head-to-Head (H2H) Archive: A dedicated rivalry module that pulls historical match logs and total win counts between specific opponents.
+Primary Pairings: 1v8, 4v5, 2v7, 3v6.
 
-## Data Management
-Persistent Storage: Local CSV-based database architecture (players.csv, history.csv) ensures no data is lost between sessions.
+Dynamic Advancement: Winners are moved through Quarterfinals, Semifinals, and Finals in real-time, with results immediately impacting league standings.
 
-Automated Match Logging: A simplified "Execute Log" interface that updates the entire global ranking system with a single click.
+3. Subject Dossiers and Matchup Analysis
+Intel Tracking: Comprehensive win/loss records and win-rate percentages.
 
-Cloud-Ready Architecture: Fully optimized for deployment on Streamlit Cloud with standardized requirements.txt dependency management.
+Progression Visualization: Time-series charts tracking rating shifts over the course of the season.
+
+Head-to-Head Statistics: Historical data comparison between specific players to determine historical dominance.
+
+System Status Key
+The platform utilizes a dynamic badge system to signify performance milestones and psychological states:
+
+Installation and Deployment
+Environment Requirements
+Python 3.9 or higher
+
+Google Cloud Console Service Account (for Sheets API access)
+
+Dependency Installation
+Configuration
+Create a .streamlit/secrets.toml file.
+
+Populate the file with your Google Sheets spreadsheet URL and service_account credentials.
+
+Ensure the spreadsheet contains three worksheets: players, history, and tournament_matches.
+
+Execution
+Document Revision: 4.2.0
+
+Environment: NOVI_MI // Detroit Catholic Central
+
+Developer Note: Ensure st.cache_data.clear() is called during match logs to prevent state desynchronization.
