@@ -9,175 +9,160 @@ if 'club' not in st.session_state:
 club = st.session_state.club
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="UTTR | NOVI TT", layout="wide")
+st.set_page_config(page_title="UTTR | NOVI", layout="wide", initial_sidebar_state="expanded")
 
-# --- CUSTOM CSS (Tactical/Technical Aesthetic) ---
+# --- FORCED DARK MODE & STYLING ---
 st.markdown("""
     <style>
-    /* Global Background and Font */
-    .stApp {
-        background-color: #05070a;
-        color: #e6edf3;
-        font-family: 'Inter', 'Roboto', sans-serif;
+    /* Force Dark Theme regardless of system settings */
+    html, body, [data-testid="stAppViewContainer"] {
+        background-color: #050505 !important;
+        color: #e0e0e0 !important;
     }
     
-    /* Header Bar */
-    .header-container {
-        border-left: 5px solid #58a6ff;
-        padding-left: 20px;
-        margin-bottom: 30px;
+    /* Sidebar styling */
+    [data-testid="stSidebar"] {
+        background-color: #0a0a0a !important;
+        border-right: 1px solid #222;
     }
-    .main-title {
-        font-size: 42px;
+
+    /* Remove Light/Dark toggle and other menu items for a cleaner look */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+
+    /* Modern "Glow" Header */
+    .hero-text {
+        font-family: 'Inter', sans-serif;
+        font-size: 50px;
         font-weight: 900;
-        letter-spacing: -1px;
-        margin: 0;
+        letter-spacing: -2px;
         color: #ffffff;
+        margin-bottom: 0px;
+        text-shadow: 0px 0px 15px rgba(88, 166, 255, 0.3);
     }
-    .sub-title {
-        color: #8b949e;
-        font-size: 14px;
-        text-transform: uppercase;
-        letter-spacing: 2px;
-    }
-
-    /* Metric Styling */
-    [data-testid="stMetricValue"] {
-        font-family: 'JetBrains Mono', monospace;
-        color: #58a6ff !important;
-        font-size: 36px !important;
-    }
-    [data-testid="stMetricLabel"] {
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        font-size: 12px !important;
+    .status-tag {
+        font-family: monospace;
+        background-color: #161b22;
+        color: #58a6ff;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        border: 1px solid #30363d;
     }
 
-    /* Sidebar Styling */
-    section[data-testid="stSidebar"] {
+    /* Metric "Cards" */
+    [data-testid="stMetric"] {
         background-color: #0d1117;
-        border-right: 1px solid #30363d;
+        border: 1px solid #30363d;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+    }
+    [data-testid="stMetricValue"] {
+        color: #58a6ff !important;
+        font-family: 'JetBrains Mono', monospace;
     }
 
-    /* Dataframe/Table Styling */
+    /* Custom Table Styling */
     .stDataFrame {
         border: 1px solid #30363d;
-        border-radius: 8px;
     }
-
-    /* Success/Info Boxes */
-    .stAlert {
-        background-color: #161b22;
-        border: 1px solid #30363d;
-        color: #58a6ff;
+    
+    /* Input fields styling */
+    .stSelectbox, .stNumberInput {
+        background-color: #0d1117 !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.markdown("### SYSTEM MENU")
-    menu = st.radio("", ["LEADERBOARD", "MATCH ENTRY", "PLAYER INTEL", "HEAD TO HEAD"])
+    st.markdown("### SYSTEM LOG")
+    menu = st.radio("PRIMARY NAVIGATION", ["LEADERBOARD", "MATCH ENTRY", "PLAYER INTEL", "HEAD TO HEAD"])
     st.markdown("---")
-    st.markdown("**LOCAL SERVER:** ACTIVE")
-    st.markdown("**DATABASE:** NOVI_V2.DB")
+    st.markdown("`LOCATION: NOVI_MI`")
+    st.markdown("`STATUS: ENCRYPTED`")
 
-# --- TOP HEADER SECTION ---
-st.markdown("""
-    <div class="header-container">
-        <p class="sub-title">Universal Table Tennis Rating</p>
-        <p class="main-title">UTTR DATA HUB</p>
-    </div>
-    """, unsafe_allow_html=True)
+# --- HEADER SECTION ---
+st.markdown('<p class="hero-text">UTTR // SYSTEM</p>', unsafe_allow_html=True)
+st.markdown('<span class="status-tag">CORE_V2.0_STABLE</span>', unsafe_allow_html=True)
+st.markdown("---")
 
 # --- NAVIGATION LOGIC ---
 if menu == "LEADERBOARD":
-    st.markdown("#### CURRENT POWER RANKINGS")
-    # Preparing data
-    data = []
+    st.markdown("### GLOBAL STANDINGS")
+    players_data = []
     sorted_players = sorted(club.players.items(), key=lambda x: x[1].rating, reverse=True)
     
     for i, (name, p) in enumerate(sorted_players):
-        data.append({
-            "RANK": i + 1,
-            "PLAYER NAME": name.upper(),
-            "UTTR RATING": int(p.rating),
+        players_data.append({
+            "RK": i + 1,
+            "PLAYER": name.upper(),
+            "RATING": int(p.rating),
             "STABILITY": f"{int(100 - (p.rd/3.5))}%"
         })
     
-    df = pd.DataFrame(data)
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(players_data), use_container_width=True, hide_index=True)
 
 elif menu == "MATCH ENTRY":
-    st.markdown("#### RECORD NEW DATA POINT")
+    st.markdown("### DATA ACQUISITION")
     with st.container():
         c1, c2 = st.columns(2)
         with c1:
-            w_name = st.selectbox("WINNER ID", sorted(list(club.players.keys())))
-            w_score = st.number_input("WINNER SCORE", min_value=0, value=11)
+            w_name = st.selectbox("WINNER_ID", sorted(list(club.players.keys())))
+            w_score = st.number_input("W_SCORE", min_value=0, value=11)
         with c2:
-            l_name = st.selectbox("LOSER ID", sorted([p for p in club.players.keys() if p != w_name]))
-            l_score = st.number_input("LOSER SCORE", min_value=0, value=9)
+            l_name = st.selectbox("LOSER_ID", sorted([p for p in club.players.keys() if p != w_name]))
+            l_score = st.number_input("L_SCORE", min_value=0, value=9)
         
-        st.markdown("---")
-        if st.button("EXECUTE DATA LOG", use_container_width=True):
+        if st.button("EXECUTE DATA OVERWRITE", use_container_width=True):
             club.update_match(w_name, l_name, w_score, l_score)
             club.save_and_show()
-            st.success(f"ENTRY CONFIRMED: {w_name.upper()} DEFEATED {l_name.upper()}")
+            st.success(f"SUCCESS: ENTRY RECORDED FOR {w_name.upper()}")
 
 elif menu == "PLAYER INTEL":
-    st.markdown("#### SUBJECT DOSSIER")
-    player_list = sorted(list(club.players.keys()))
-    search_name = st.selectbox("SELECT SUBJECT", player_list)
+    st.markdown("### SUBJECT DOSSIER")
+    search_name = st.selectbox("IDENTIFY SUBJECT", sorted(list(club.players.keys())))
     p = club.players[search_name]
     
-    # Visual grid for player stats
     col1, col2, col3 = st.columns(3)
-    col1.metric("CURRENT RATING", int(p.rating))
+    col1.metric("UTTR_RATING", int(p.rating))
     
     if os.path.exists(club.history_file):
         h_df = pd.read_csv(club.history_file)
-        wins = len(h_df[h_df['Winner'] == search_name])
-        losses = len(h_df[h_df['Loser'] == search_name])
-        col2.metric("W / L RECORD", f"{wins} - {losses}")
+        w = len(h_df[h_df['Winner'] == search_name])
+        l = len(h_df[h_df['Loser'] == search_name])
+        col2.metric("RECORD", f"{w}W - {l}L")
     
-    col3.metric("RATING STABILITY", f"{int(100 - (p.rd/3.5))}%")
+    col3.metric("STABILITY", f"{int(100 - (p.rd/3.5))}%")
     
     st.markdown("---")
-    st.markdown("#### RECENT ACTIVITY LOG")
+    st.markdown("### ACTIVITY LOG")
     if os.path.exists(club.history_file):
         h_df = pd.read_csv(club.history_file)
         p_history = h_df[(h_df['Winner'] == search_name) | (h_df['Loser'] == search_name)].tail(10)
         st.table(p_history[['Date', 'Winner', 'Loser', 'Score']])
 
 elif menu == "HEAD TO HEAD":
-    st.markdown("#### COMPARISON ANALYSIS")
-    p_list = sorted(list(club.players.keys()))
+    st.markdown("### BATTLE LOGS")
     c1, c2 = st.columns(2)
-    subject_a = c1.selectbox("SUBJECT A", p_list)
-    subject_b = c2.selectbox("SUBJECT B", sorted([x for x in p_list if x != subject_a]))
+    s_a = c1.selectbox("SUBJECT_A", sorted(list(club.players.keys())))
+    s_b = c2.selectbox("SUBJECT_B", sorted([x for x in club.players.keys() if x != s_a]))
     
-    if st.button("RUN MATCHUP SIMULATION", use_container_width=True):
+    if st.button("RUN ANALYTICS", use_container_width=True):
         if os.path.exists(club.history_file):
             df = pd.read_csv(club.history_file)
-            h2h = df[((df['Winner'] == subject_a) & (df['Loser'] == subject_b)) | 
-                     ((df['Winner'] == subject_b) & (df['Loser'] == subject_a))]
+            h2h = df[((df['Winner'] == s_a) & (df['Loser'] == s_b)) | 
+                     ((df['Winner'] == s_b) & (df['Loser'] == s_a))]
             
             if not h2h.empty:
-                a_wins = len(h2h[h2h['Winner'] == subject_a])
-                b_wins = len(h2h[h2h['Winner'] == subject_b])
+                w_a = len(h2h[h2h['Winner'] == s_a])
+                w_b = len(h2h[h2h['Winner'] == s_b])
                 
-                # Big Scoreboard Layout
                 m1, m2, m3 = st.columns([3, 1, 3])
-                m1.markdown(f"<h1 style='text-align:right;'>{a_wins}</h1>", unsafe_allow_html=True)
-                m1.markdown(f"<p style='text-align:right; font-weight:bold;'>{subject_a.upper()}</p>", unsafe_allow_html=True)
+                m1.markdown(f"<h1 style='text-align:right;'>{w_a}</h1><p style='text-align:right;'>{s_a.upper()}</p>", unsafe_allow_html=True)
+                m2.markdown("<h1 style='text-align:center; color:#333;'>VS</h1>", unsafe_allow_html=True)
+                m3.markdown(f"<h1>{w_b}</h1><p>{s_b.upper()}</p>", unsafe_allow_html=True)
                 
-                m2.markdown("<h1 style='text-align:center; color:#30363d;'>VS</h1>", unsafe_allow_html=True)
-                
-                m3.markdown(f"<h1>{b_wins}</h1>", unsafe_allow_html=True)
-                m3.markdown(f"<p style='font-weight:bold;'>{subject_b.upper()}</p>", unsafe_allow_html=True)
-                
-                st.markdown("---")
                 st.dataframe(h2h[['Date', 'Winner', 'Score']].tail(10), use_container_width=True)
-            else:
-                st.info("NO HISTORICAL DATA EXISTS FOR THIS SPECIFIC MATCHUP.")
