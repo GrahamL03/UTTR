@@ -1,8 +1,8 @@
 # UTTR // NOVI
 
-## Universal Table Tennis Rankings & Tournament Management System
+## Unified Table Tennis Rankings & Tournament Management System
 
-UTTR (Universal Table Tennis Rankings) is a professional-grade league management platform developed for Detroit Catholic Central. It utilizes the **Glicko-2** rating system—the same mathematical framework used by competitive chess and professional esports—to provide highly accurate skill assessment, automated tournament seeding, and longitudinal performance tracking.
+UTTR (Unified Table Tennis Rankings) is a professional-grade league management platform developed for Detroit Catholic Central. It utilizes the **Glicko-2** rating system—the same mathematical framework used by competitive chess and professional esports—to provide highly accurate skill assessment, automated tournament seeding, and longitudinal performance tracking.
 
 ---
 
@@ -14,6 +14,45 @@ The system is built on a high-concurrency, cloud-synchronized architecture:
 * **Data Layer:** Real-time integration with Google Sheets via `st.connection`, serving as a distributed database.
 * **Interface:** Streamlit-driven SPA (Single Page Application) with custom CSS injection for high-contrast, low-latency navigation.
 * **Predictive Modeling:** Logistic distribution functions used to calculate win probabilities for any given matchup.
+
+---
+
+## Mathematical Foundation: Glicko-2
+
+The UTTR engine operates on the Glicko-2 scale. This system improves upon traditional Elo by introducing a confidence interval (Rating Deviation) and a consistency factor (Volatility).
+
+### 1. Scaling to Glicko-2
+
+Before computation, standard ratings ($R$) and deviations ($RD$) are converted to the Glicko-2 scale ($\mu$ and $\phi$):
+
+$$\mu = \frac{R - 1500}{173.7178}$$
+
+$$\phi = \frac{RD}{173.7178}$$
+
+### 2. The Estimated Improvement
+
+The system calculates the estimated improvement ($\Delta$) and the variance ($v$) based on the player's performance against opponents:
+
+$$v = \left[ \sum_{j=1}^{m} g(\phi_j)^2 E(\mu, \mu_j, \phi_j) (1 - E(\mu, \mu_j, \phi_j)) \right]^{-1}$$
+
+Where $g(\phi)$ is a weighting function:
+
+
+$$g(\phi) = \frac{1}{\sqrt{1 + 3\phi^2 / \pi^2}}$$
+
+### 3. Win Probability Calculation
+
+The expected outcome $E$ (win probability) between Player A and Player B is calculated using a logistic curve:
+
+$$E = \frac{1}{1 + e^{-g(\phi_j)(\mu - \mu_j)}}$$
+
+In the "Versus" module, this is presented as a percentage to represent the statistical favorite.
+
+### 4. Dominant Win Multiplier
+
+To reward high-performance outcomes (e.g., an 11-0 shutout), UTTR applies a point-spread multiplier to the final rating shift:
+
+$$\text{Multiplier} = 1 + \frac{|\text{Score Difference}|}{22}$$
 
 ---
 
@@ -34,24 +73,18 @@ The system features an automated 8-man bracket generator. Matches are seeded to 
 * **Primary Pairings:** 1v8, 4v5, 2v7, 3v6.
 * **Dynamic Advancement:** Winners are moved through Quarterfinals, Semifinals, and Finals in real-time, with results immediately impacting league standings.
 
-### 3. Subject Dossiers and Matchup Analysis
-
-* **Intel Tracking:** Comprehensive win/loss records and win-rate percentages.
-* **Progression Visualization:** Time-series charts tracking rating shifts over the course of the season.
-* **Head-to-Head Statistics:** Historical data comparison between specific players to determine historical dominance.
-
 ---
 
 ## System Status Key
 
-The platform utilizes a dynamic badge system to signify performance milestones and psychological states:
+The platform utilizes a dynamic badge system to signify performance milestones:
 
 | Badge | Criteria |
 | --- | --- |
 | 🥇 CHAMP | Occupies the Rank 1 position in the league. |
 | 🔥 ON FIRE | Achieved 3 consecutive match victories. |
 | 👑 UNSTOPPABLE | Achieved 5+ consecutive match victories. |
-| 🛡️ WALL | RD is below 50, signifying a highly stable and verified rank. |
+| 🛡️ WALL | RD is below 50, signifying a highly stable rank. |
 | 🔨 SLAYER | A non-top 3 player who defeated a Top 3 opponent. |
 | 💎 VETERAN | Logged a minimum of 50 competitive matches. |
 | 🐣 ROOKIE | Logged fewer than 5 competitive matches. |
@@ -63,23 +96,12 @@ The platform utilizes a dynamic badge system to signify performance milestones a
 
 ## Installation and Deployment
 
-### Environment Requirements
-
-* Python 3.9 or higher
-* Google Cloud Console Service Account (for Sheets API access)
-
 ### Dependency Installation
 
 ```bash
 pip install streamlit pandas streamlit-gsheets glicko2
 
 ```
-
-### Configuration
-
-1. Create a `.streamlit/secrets.toml` file.
-2. Populate the file with your Google Sheets `spreadsheet` URL and `service_account` credentials.
-3. Ensure the spreadsheet contains three worksheets: `players`, `history`, and `tournament_matches`.
 
 ### Execution
 
@@ -92,4 +114,3 @@ streamlit run app.py
 
 **Document Revision:** 4.2.0
 **Environment:** NOVI_MI // Detroit Catholic Central
-**Developer Note:** Ensure `st.cache_data.clear()` is called during match logs to prevent state desynchronization.
