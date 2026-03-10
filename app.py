@@ -221,6 +221,23 @@ elif menu == "STANDINGS":
             p_matches = h_df[(h_df['Winner'] == name) | (h_df['Loser'] == name)]
             last_5 = p_matches.tail(5)
             streak, l_streak = 0, 0
+            
+            last_3 = p_matches.tail(3)
+            dominance_count = 0
+            
+            if len(last_3) >= 3:
+                for _, row in last_3.iterrows():
+                    # Only count if they actually won the match
+                    if row['Winner'] == name:
+                        try:
+                            # Split "11-4" into [11, 4]
+                            pts = [int(x) for x in row['Score'].split('-')]
+                            spread = abs(pts[0] - pts[1])
+                            if spread > 6:
+                                dominance_count += 1
+                        except:
+                            pass # Handle any malformed score strings
+            
             for _, row in last_5.iterrows():
                 if row['Winner'] == name:
                     form_str += "W "; streak += 1; l_streak = 0
@@ -229,6 +246,7 @@ elif menu == "STANDINGS":
             
             # --- BADGE LOGIC ---
             if i == 0: badges.append("🥇 CHAMP")
+            if dominance_count >= 3: badges.append("😤 DOMINANT") # THE NEW BADGE
             if streak >= 3: badges.append("🔥 ON FIRE")
             if streak >= 5: badges.append("👑 UNSTOPPABLE")
             if l_streak >= 3: badges.append("🧊 COLD")
@@ -466,5 +484,5 @@ elif menu == "HALL OF FAME":
 st.markdown('<div class="floating-legend">', unsafe_allow_html=True)
 with st.popover("📜 STATUS KEY"):
     st.markdown("### UTTR // STATUS EFFECTS")
-    st.markdown("🥇 CHAMP | 🔥 ON FIRE | 👑 UNSTOPPABLE | 🧊 COLD | 🛡️ WALL | 💎 VETERAN | 🐣 ROOKIE | 🔨 SLAYER | ❓ UNKNOWN | ⚡ RAID")
+    st.markdown("🥇 CHAMP | 😤 DOMINANT | 🔥 ON FIRE | 👑 UNSTOPPABLE | 🧊 COLD | 🛡️ WALL | 💎 VETERAN | 🐣 ROOKIE | 🔨 SLAYER | ❓ UNKNOWN | ⚡ RAID")
 st.markdown('</div>', unsafe_allow_html=True)
