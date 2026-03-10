@@ -56,10 +56,15 @@ elif menu == "Record Match":
 
 elif menu == "Player Search":
     st.header("🔍 Player Profile")
-    search_name = st.selectbox("Select Player", sorted(list(club.players.keys())))
+    
+    # 1. DEFINE search_name FIRST
+    player_list = sorted(list(club.players.keys()))
+    search_name = st.selectbox("Select Player", player_list)
+    
+    # 2. Now that search_name exists, we can use it
     p = club.players[search_name]
     
-    # Calculate Wins/Losses for the profile
+    # Calculate Wins/Losses
     if os.path.exists(club.history_file):
         h_df = pd.read_csv(club.history_file)
         wins = len(h_df[h_df['Winner'] == search_name])
@@ -67,11 +72,12 @@ elif menu == "Player Search":
     else:
         wins, losses = 0, 0
 
+    # Display Metrics
     c1, c2, c3 = st.columns(3)
     c1.metric("Rating", round(p.rating, 1))
     c2.metric("Record", f"{wins}W - {losses}L")
     c3.metric("Confidence (RD)", round(p.rd, 1))
-
+    
 elif menu == "Head-to-Head":
     st.header("🔥 Rivalry Stats")
     p1 = st.selectbox("Player 1", sorted(list(club.players.keys())))
