@@ -37,6 +37,15 @@ class ClubManager:
         if name not in self.players:
             self.players[name] = glicko2.Player()
 
+    def add_new_player(self, name):
+        name = name.strip()
+        if name and name not in self.players:
+            # Initialize with standard Glicko-2 defaults (1500, 350, 0.06)
+            self.players[name] = glicko2.Player()
+            self.save_to_cloud()
+            return True
+        return False
+    
     def update_match(self, w_name, l_name, w_pts, l_pts):
         self.check_or_add_player(w_name)
         self.check_or_add_player(l_name)
