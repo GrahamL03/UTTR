@@ -103,7 +103,7 @@ with st.sidebar:
 st.markdown(f"""
     <div class="header-section">
         <p class="sub-title">Universal Table Tennis Rating</p>
-        <p class="main-title">UTTR // COMMAND</p>
+        <p class="main-title">UTTR</p>
     </div>
     """, unsafe_allow_html=True)
 
