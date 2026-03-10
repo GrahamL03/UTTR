@@ -91,6 +91,7 @@ The platform utilizes a dynamic badge system to signify performance milestones:
 | 🧊 COLD | Sustained 3+ consecutive match losses. |
 | ⚡ RAID | Maintained a perfect 5-0 record over the last 5 matches. |
 | ❓ UNKNOWN | RD exceeds 120, requiring more data for an accurate rank. |
+| 😤  Dominant | Last 3 matches have been won by 6 or more. |
 
 ---
 
