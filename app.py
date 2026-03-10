@@ -66,6 +66,7 @@ if 'bracket' not in st.session_state:
     st.session_state.bracket = None
 
 # --- 3. PAGE CONFIG & UI ---
+# --- 3. PAGE CONFIG & UI ---
 st.set_page_config(page_title="UTTR // NOVI", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
@@ -82,7 +83,37 @@ st.markdown("""
         background: linear-gradient(90deg, #58a6ff 0%, #0052cc 100%);
         height: 6px; width: 100%; position: fixed; top: 0; left: 0; z-index: 9999;
     }
-    .header-section {
+
+    /* NEW BANNER STYLES START HERE */
+    .main-banner-content {
+        text-align: center;
+        padding: 30px 20px; /* Increased padding for more space */
+        margin-top: 10px; /* Small gap from the top-banner line */
+        margin-bottom: 40px; /* More space before the content below */
+        background: linear-gradient(180deg, rgba(88, 166, 255, 0.05) 0%, rgba(5, 5, 5, 0) 100%); /* Subtle gradient */
+        border-bottom: 1px solid rgba(88, 166, 255, 0.2); /* Soft separator line */
+    }
+
+    .banner-title {
+        font-size: 3.2em; /* Larger font for the main title */
+        font-weight: 900;
+        color: #ffffff;
+        letter-spacing: 2px;
+        margin-bottom: 10px;
+        text-shadow: 0 0 10px rgba(88, 166, 255, 0.4); /* Subtle glow */
+    }
+
+    .banner-subtitle {
+        font-family: 'Consolas', 'Monaco', monospace; /* Monospace for the UTTR part */
+        font-size: 1.1em;
+        color: #58a6ff; /* Your theme's blue */
+        letter-spacing: 5px; /* Wider spacing */
+        text-transform: uppercase;
+        opacity: 0.8;
+    }
+    /* NEW BANNER STYLES END HERE */
+
+    .header-section { /* This seems unused, but keeping it if you plan to use it */
         background: linear-gradient(180deg, rgba(88, 166, 255, 0.1) 0%, rgba(5, 5, 5, 0) 100%);
         padding: 40px 20px; border-radius: 0 0 20px 20px; margin-top: -50px; margin-bottom: 30px;
     }
@@ -98,10 +129,15 @@ st.markdown("""
         border-radius: 20px !important;
     }
     </style>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 st.markdown('<div class="top-banner"></div>', unsafe_allow_html=True)
-
+st.markdown("""
+    <div class="main-banner-content">
+        <div class="banner-title">CATHOLIC CENTRAL TABLE TENNIS</div>
+        <div class="banner-subtitle">UNIVERSAL TABLE TENNIS RANKING (UTTR)</div>
+    </div>
+""", unsafe_allow_html=True)
 # --- 4. LOGGING UTILITY (Must be defined globally) ---
 def log_tournament_match(p1, p2, round_name, winner, status="Completed"):
     global h_df, t_df
