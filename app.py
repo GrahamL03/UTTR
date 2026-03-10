@@ -281,7 +281,7 @@ elif menu == "STANDINGS":
 
     # --- NEW: CLUSTERED RATING DISTRIBUTION ---
     st.markdown("---")
-    st.caption("LEAGUE RATING DISTRIBUTION (100pt TIERS)")
+    st.caption("LEAGUE RATING DISTRIBUTION (250pt TIERS)")
     
     all_ratings = [int(p.rating) for p in club.players.values()]
     
