@@ -1,0 +1,3 @@
+glicko2
+pandas
+streamlit
