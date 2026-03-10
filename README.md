@@ -1,8 +1,8 @@
 # UTTR // NOVI
 
-## Unified Table Tennis Rankings & Tournament Management System
+## Universal Table Tennis Rankings & Tournament Management System
 
-UTTR (Unified Table Tennis Rankings) is a professional-grade league management platform developed for Detroit Catholic Central. It utilizes the **Glicko-2** rating system—the same mathematical framework used by competitive chess and professional esports—to provide highly accurate skill assessment, automated tournament seeding, and longitudinal performance tracking.
+UTTR (Universal Table Tennis Rankings) is a professional-grade league management platform developed for Detroit Catholic Central. It utilizes the **Glicko-2** rating system—the same mathematical framework used by competitive chess and professional esports—to provide highly accurate skill assessment, automated tournament seeding, and longitudinal performance tracking.
 
 ---
 
@@ -93,5 +93,3 @@ streamlit run app.py
 **Document Revision:** 4.2.0
 **Environment:** NOVI_MI // Detroit Catholic Central
 **Developer Note:** Ensure `st.cache_data.clear()` is called during match logs to prevent state desynchronization.
-
-Would you like me to generate a technical deep-dive into the specific Glicko-2 equations used in the Python logic?
