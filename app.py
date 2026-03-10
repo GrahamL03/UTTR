@@ -172,11 +172,22 @@ elif menu == "TOURNAMENT":
     if st.session_state.bracket is None:
         t_id = st.text_input("TOURNAMENT ID", value=f"T-{datetime.now().strftime('%m%d-%H%M')}")
         selected = st.multiselect("Select 8 Players", sorted(list(club.players.keys())))
-        if len(selected) == 8 and st.button("GENERATE BRACKET", use_container_width=True):
-            random.shuffle(selected)
+        if len(selected) == 8 and st.button("GENERATE SEEDED BRACKET", use_container_width=True):
+            # 1. Sort players by rating (Highest to Lowest)
+            seeded = sorted(selected, key=lambda x: club.players[x].rating, reverse=True)
+            
+            # 2. Create standard tournament pairings (1v8, 4v5, 2v7, 3v6)
+            # This follows a standard Quarterfinal layout
+            pairings = [
+                (seeded[0], seeded[7]), # Match 1: 1st vs 8th
+                (seeded[3], seeded[4]), # Match 2: 4th vs 5th
+                (seeded[1], seeded[6]), # Match 3: 2nd vs 7th
+                (seeded[2], seeded[5])  # Match 4: 3rd vs 6th
+            ]
+            
             st.session_state.bracket = {
                 "id": t_id,
-                "QF": [{"p1": selected[i], "p2": selected[i+1], "w": None} for i in range(0, 8, 2)],
+                "QF": [{"p1": p1, "p2": p2, "w": None} for p1, p2 in pairings],
                 "SF": [{"p1": "TBD", "p2": "TBD", "w": None}, {"p1": "TBD", "p2": "TBD", "w": None}],
                 "F": {"p1": "TBD", "p2": "TBD", "w": None}
             }
@@ -244,13 +255,9 @@ elif menu == "LOG MATCH":
         l_name = st.selectbox("LOSER", sorted([p for p in club.players.keys() if p != w_name]))
         score = st.text_input("SCORE", value="11-0")
         if st.button("EXECUTE LOG", use_container_width=True):
-            new_hist = pd.DataFrame([{
-                "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "Winner": w_name, "Loser": l_name, "Score": score, "Match_Type": "Ranked"
-            }])
-            updated_h = pd.concat([h_df, new_hist], ignore_index=True)
-            conn.update(worksheet="history", data=updated_h)
-            club.update_match(w_name, l_name, 11, 0)
+            # club.update_match already handles the Glicko math AND the cloud save
+            club.update_match(w_name, l_name, 11, 0) 
+            st.success(f"MATCH ARCHIVED: {w_name} DEFEATED {l_name}")
             st.rerun()
 
 elif menu == "PLAYER INTEL":
@@ -272,17 +279,24 @@ elif menu == "PLAYER INTEL":
 
     with col2:
         st.caption("RATING PROGRESSION")
-        # Logic to build a timeline of ratings for this player
         if not h_df.empty:
-            # Filter matches for this player and sort by date
             personal_history = h_df[(h_df['Winner'] == name) | (h_df['Loser'] == name)].copy()
             
-            # Since we don't store historical rating in h_df yet, 
-            # this chart will show match frequency/activity for now.
-            # PRO TIP: To show a true line chart, you'd need to re-calculate 
-            # the rating step-by-step from the start of the history.
-            personal_history['Match_Count'] = range(1, len(personal_history) + 1)
-            st.line_chart(personal_history.set_index('Date')['Match_Count'])
+            # Start everyone at 1500
+            current_rating = 1500
+            ratings_over_time = []
+            
+            for _, row in personal_history.iterrows():
+                # This is a 'Lite' version of the history
+                # It adds 25 for a win and subtracts 20 for a loss just for the visual
+                if row['Winner'] == name:
+                    current_rating += 25
+                else:
+                    current_rating -= 20
+                ratings_over_time.append(current_rating)
+            
+            personal_history['Rating_History'] = ratings_over_time
+            st.line_chart(personal_history.set_index('Date')['Rating_History'])
 
 elif menu == "VERSUS":
     st.markdown("#### MATCHUP ANALYSIS")
