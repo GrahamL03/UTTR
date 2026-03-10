@@ -53,23 +53,7 @@ $$\text{Multiplier} = 1 + \frac{|\text{Score Difference}|}{22}$$
 
 ---
 
-## Core Functionality
-
-### 1. Competitive Rating System
-
-Unlike traditional Elo systems, UTTR measures three distinct variables for every player:
-
-* **Rating:** The estimated skill level (standardized at 1500 for new subjects).
-* **Rating Deviation (RD):** The degree of certainty the system has in a player's rank. High RD indicates "Unknown" status; low RD indicates a "Stable" rank.
-* **Volatility:** The degree of expected fluctuation in a player's performance over time.
-
-### 2. Tournament Bracket Control
-
-The system features an automated 8-man bracket generator. Matches are seeded to ensure competitive integrity:
-
-* **Primary Pairings:** 1v8, 4v5, 2v7, 3v6.
-* **Dynamic Advancement:** Winners are moved through Quarterfinals, Semifinals, and Finals in real-time, with results immediately impacting league standings.
-
+Core Functionality1. Competitive Rating SystemThe UTTR engine moves beyond the static nature of traditional Elo by implementing a tri-variable assessment for every athlete. This ensures that the rankings reflect not just who you beat, but how reliably you perform.Rating ($\mu$): The primary skill estimate. New players enter the system at a standardized 1500. This value represents the player's "true" skill level after accounting for the difficulty of their historical opponents.Rating Deviation (RD / $\phi$): A measure of the system’s confidence in a player's rank.Activity-Based Decay: RD increases over time if a player is inactive, reflecting the system’s growing uncertainty about their current skill.Reliability: A low RD (represented by the 🛡️ WALL badge) indicates a verified veteran, while a high RD indicates a "Rookie" or "Inactive" status.Volatility ($\sigma$): A consistency metric that tracks a player's performance fluctuations. A player with high volatility is prone to "upsets," while low volatility indicates a highly predictable, consistent performance profile.2. Tournament Bracket ControlUTTR features a proprietary 8-man bracket automation system designed to minimize "easy paths" and maximize high-stakes matchups.Seeding-to-Rating Mapping: The system automatically scrapes the top 8 (or selected 8) ratings to generate a mathematically balanced bracket:Quadrant A: Seed 1 vs Seed 8 | Seed 4 vs Seed 5Quadrant B: Seed 2 vs Seed 7 | Seed 3 vs Seed 6Real-Time Advancement: Utilizing a state-machine architecture, the bracket handles "BYE" rounds for smaller fields and pushes winners to the next phase with a single click.Standings Integration: Unlike standard "friendly" tournaments, every match played within the bracket is fed back into the Glicko-2 engine, ensuring that playoff performance directly impacts the official league rankings.3. Predictive Analytics (The "Versus" Module)Before a match even begins, the system utilizes a Logistic Win-Probability Function. By comparing the $\mu$ and $\phi$ of two players, the engine can output a statistical favorite.Underdog Calculation: This is the foundation of the 🔨 SLAYER badge logic.Matchmaking: This tool allows club administrators to simulate potential matchups to find the most competitive pairings for exhibition play.
 ---
 
 ## System Status Key
