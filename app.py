@@ -164,7 +164,7 @@ if is_admin:
             else:
                 st.error("Please provide a season name and check the confirmation box.")
 # --- 6. NAVIGATION LOGIC ---
-if menu == "STANDINGS":
+elif menu == "STANDINGS":
     st.markdown("#### LEAGUE TABLE")
     sorted_players = sorted(club.players.items(), key=lambda x: x[1].rating, reverse=True)
     top_3 = [x[0] for x in sorted_players[:3]]
@@ -173,6 +173,13 @@ if menu == "STANDINGS":
     for i, (name, p) in enumerate(sorted_players):
         badges = []
         form_str = ""
+        rating_val = int(p.rating)
+        
+        # --- NEW: TIER EMOJI LOGIC ---
+        tier_emoji = "🥉" # Bronze
+        if rating_val >= 1800: tier_emoji = "💎" # Diamond
+        elif rating_val >= 1700: tier_emoji = "🥇" # Gold
+        elif rating_val >= 1600: tier_emoji = "🥈" # Silver
         
         if not h_df.empty:
             p_matches = h_df[(h_df['Winner'] == name) | (h_df['Loser'] == name)]
@@ -199,32 +206,42 @@ if menu == "STANDINGS":
 
         players_data.append({
             "RK": i + 1,
-            "PLAYER": name.upper(),
-            "RATING": int(p.rating),
+            "PLAYER": f"{tier_emoji} {name.upper()}",
+            "RATING": rating_val,
             "STATUS": " ".join(badges) if badges else "---",
             "FORM": form_str.strip() if form_str else "---",
             "STABILITY": f"{int(100 - (p.rd/3.5))}%"
         })
 
-    # --- RENDER (Outside the for-loop) ---
+    # --- RENDER TABLE ---
     st.dataframe(
         pd.DataFrame(players_data), 
         use_container_width=True, 
         hide_index=True,
         column_config={
             "RATING": st.column_config.ProgressColumn(
-                "RATING", min_value=1000, max_value=2500, format="%d" # FIXED: Bumped max_value to 2500 so it doesn't break
+                "RATING", min_value=1000, max_value=2500, format="%d"
             )
         }
     )
 
+    # --- NEW: CLUSTERED RATING DISTRIBUTION ---
     st.markdown("---")
-    st.caption("LEAGUE RATING DISTRIBUTION")
+    st.caption("LEAGUE RATING DISTRIBUTION (100pt TIERS)")
+    
     all_ratings = [int(p.rating) for p in club.players.values()]
+    
     if all_ratings:
-        rating_counts = pd.Series(all_ratings).value_counts().sort_index()
-        st.bar_chart(rating_counts)
-
+        df_dist = pd.DataFrame(all_ratings, columns=['Rating'])
+        # Cluster into 100-point buckets
+        df_dist['Tier'] = (df_dist['Rating'] // 100) * 100
+        df_dist['Range'] = df_dist['Tier'].apply(lambda x: f"{x}-{x+99}")
+        
+        # Count players per tier and sort numerically
+        dist_counts = df_dist.groupby(['Tier', 'Range']).size().reset_index(name='Players')
+        dist_counts = dist_counts.sort_values('Tier')
+        
+        st.bar_chart(dist_counts.set_index('Range')['Players'])
 elif menu == "TOURNAMENT":
     st.markdown("#### 🏆 BRACKET CONTROL")
     if st.session_state.bracket is None:
