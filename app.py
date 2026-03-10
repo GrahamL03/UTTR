@@ -2,58 +2,44 @@ import streamlit as st
 import pandas as pd
 from glicko_logic import ClubManager
 import math
+import random
+from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
 
-# --- 1. INITIALIZE CONNECTION FIRST ---
-# We need the connection BEFORE we can read the data
+# --- 1. INITIALIZE CONNECTION & CACHED DATA ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 2. GLOBAL DATA LOAD (SPEED BOOST) ---
-# We use ttl=60 so it caches for 1 minute
-try:
-    h_df = conn.read(worksheet="history", ttl=60)
-    p_df = conn.read(worksheet="players", ttl=60)
-except:
-    h_df = pd.DataFrame()
-    p_df = pd.DataFrame()
+def load_data():
+    try:
+        h_df = conn.read(worksheet="history", ttl=2) 
+        p_df = conn.read(worksheet="players", ttl=60)
+        try:
+            t_df = conn.read(worksheet="tournament_matches", ttl=2)
+        except:
+            t_df = pd.DataFrame(columns=["Tournament_ID", "Player_A", "Player_B", "Round", "Winner", "Status"])
+        return h_df, p_df, t_df
+    except Exception as e:
+        st.error(f"DATABASE LINK FAILURE: {e}")
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-# --- 3. INITIALIZE CLUB LOGIC ---
+h_df, p_df, t_df = load_data()
+
+# --- 2. INITIALIZE CLUB LOGIC ---
 if 'club' not in st.session_state:
     st.session_state.club = ClubManager()
 club = st.session_state.club
 
-# --- PAGE CONFIG ---
-st.set_page_config(
-    page_title="UTTR // NOVI", 
-    layout="wide", 
-    initial_sidebar_state="expanded"
-)
+if 'bracket' not in st.session_state:
+    st.session_state.bracket = None
+
+# --- 3. PAGE CONFIG & UI ---
+st.set_page_config(page_title="UTTR // NOVI", layout="wide", initial_sidebar_state="expanded")
+
 st.markdown("""
     <style>
     html, body, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
         background-color: #050505 !important;
         color: #e0e0e0 !important;
-        /* Styling for the Status column in the dataframe isn't direct, 
-       but we can make the text glow or stand out in the metrics */
-    [data-testid="stHeader"] {
-        border-bottom: 1px solid #21262d;
-    }
-    /* Floating Legend Button */
-    .floating-legend {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        z-index: 1000;
-    }
-    
-    /* Make the popover button look like a tech-badge */
-    div[data-testid="stPopover"] > button {
-        background-color: #1a1a1a !important;
-        border: 1px solid #58a6ff !important;
-        color: #58a6ff !important;
-        border-radius: 20px !important;
-        padding: 5px 15px !important;
-    }
     }
     [data-testid="stSidebar"] {
         background-color: #080808 !important;
@@ -70,110 +56,89 @@ st.markdown("""
     .main-title { font-size: 42px; font-weight: 800; color: #ffffff; margin: 0; }
     .sub-title { color: #58a6ff; font-family: monospace; font-size: 12px; letter-spacing: 4px; text-transform: uppercase; }
     [data-testid="stMetric"] { background-color: rgba(255, 255, 255, 0.03) !important; border: 1px solid #21262d !important; padding: 15px !important; border-radius: 10px !important; }
+    
+    .floating-legend { position: fixed; bottom: 20px; right: 20px; z-index: 1000; }
+    div[data-testid="stPopover"] > button {
+        background-color: #1a1a1a !important;
+        border: 1px solid #58a6ff !important;
+        color: #58a6ff !important;
+        border-radius: 20px !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
 st.markdown('<div class="top-banner"></div>', unsafe_allow_html=True)
 
-# --- SIDEBAR ---
+# --- 4. LOGGING UTILITY (Must be defined globally) ---
+def log_tournament_match(p1, p2, round_name, winner, status="Completed"):
+    global h_df, t_df
+    # 1. Log to tournament_matches sheet
+    new_t_row = pd.DataFrame([{
+        "Tournament_ID": st.session_state.bracket["id"],
+        "Player_A": p1, "Player_B": p2, "Round": round_name, "Winner": winner, "Status": status
+    }])
+    updated_t = pd.concat([t_df, new_t_row], ignore_index=True)
+    conn.update(worksheet="tournament_matches", data=updated_t)
+    
+    # 2. Log to history sheet
+    new_h_row = pd.DataFrame([{
+        "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "Winner": winner, 
+        "Loser": p2 if winner == p1 else p1,
+        "Score": "11-0", 
+        "Match_Type": "Tournament"
+    }])
+    updated_h = pd.concat([h_df, new_h_row], ignore_index=True)
+    conn.update(worksheet="history", data=updated_h)
+
+# --- 5. SIDEBAR ---
 with st.sidebar:
     st.markdown("### UTTR // NAV")
-    menu = st.radio("", ["STANDINGS", "LOG MATCH", "PLAYER INTEL", "VERSUS"])
+    menu = st.radio("", ["STANDINGS", "TOURNAMENT", "LOG MATCH", "PLAYER INTEL", "VERSUS"])
     st.markdown("---")
-    st.markdown("### SYSTEM TOOLS")
     with st.expander("REGISTER NEW SUBJECT"):
-        new_name = st.text_input("NAME", placeholder="Full Name...")
-        if st.button("INITIALIZE", use_container_width=True):
-            if new_name:
-                success = club.add_new_player(new_name)
-                if success:
-                    st.success(f"INITIALIZED: {new_name.upper()}")
-                    st.rerun()
-                else:
-                    st.error("SUBJECT ALREADY EXISTS")
-            else:
-                st.warning("INPUT REQUIRED")
-    st.markdown("---")
-    st.caption("CORE_V3.0 // NOVI_MI")
+        new_name = st.text_input("NAME")
+        if st.button("INITIALIZE"):
+            if new_name and club.add_new_player(new_name):
+                st.success("SUCCESS"); st.rerun()
+    st.caption("CORE_V4.2 // NOVI_MI")
 
-# --- HEADER ---
-st.markdown(f"""<div class="header-section"><p class="sub-title">Universal Table Tennis Rating</p><p class="main-title">UTTR</p></div>""", unsafe_allow_html=True)
+st.markdown(f'<div class="header-section"><p class="sub-title">Detroit Catholic Central</p><p class="main-title">UTTR</p></div>', unsafe_allow_html=True)
 
-# --- NAVIGATION LOGIC ---
+# --- 6. NAVIGATION LOGIC ---
 
 if menu == "STANDINGS":
     st.markdown("#### LEAGUE TABLE")
-    
-    # 1. FETCH DATA
-    try:
-        h_df = conn.read(worksheet="history", ttl=0)
-        has_history = not h_df.empty
-    except:
-        has_history = False
-    
-    players_data = []
-    # Sort by Rating (Glicko-2)
     sorted_players = sorted(club.players.items(), key=lambda x: x[1].rating, reverse=True)
     top_3_names = [x[0] for x in sorted_players[:3]]
-    
-    # 2. CALCULATION LOOP
+    players_data = []
+
     for i, (name, p) in enumerate(sorted_players):
         badges = []
         form_str = ""
         
-        if has_history:
-            # Filter matches for this specific subject
+        if not h_df.empty:
             p_matches = h_df[(h_df['Winner'] == name) | (h_df['Loser'] == name)]
             last_5 = p_matches.tail(5)
-            total_games = len(p_matches)
-            
-            # --- FORM & STREAKS ---
-            streak = 0
-            l_streak = 0
+            streak, l_streak = 0, 0
             for _, row in last_5.iterrows():
                 if row['Winner'] == name:
-                    form_str += "W "
-                    streak += 1
-                    l_streak = 0
+                    form_str += "W "; streak += 1; l_streak = 0
                 else:
-                    form_str += "L "
-                    l_streak += 1
-                    streak = 0
-
-            # --- PERFORMANCE BADGES ---
-            if streak >= 3: badges.append("🔥 ON FIRE")
-            if streak >= 5: badges.append("👑 UNSTOPPABLE")
-            if l_streak >= 3: badges.append("🧊 COLD")
+                    form_str += "L "; l_streak += 1; streak = 0
             
-            # GIANT SLAYER: Beat a Top 3 player while not being Top 3 yourself
-            if not last_5.empty:
-                last_match = last_5.iloc[-1]
-                if last_match['Winner'] == name and last_match['Loser'] in top_3_names and name not in top_3_names:
-                    badges.append("🔨 SLAYER")
+            if i == 0: badges.append("🥇 CHAMP")                  # 1. Rank 1
+            if streak >= 3: badges.append("🔥 ON FIRE")          # 2. 3 Wins
+            if streak >= 5: badges.append("👑 UNSTOPPABLE")       # 3. 5 Wins
+            if l_streak >= 3: badges.append("🧊 COLD")             # 4. 3 Losses
+            if p.rd < 50: badges.append("🛡️ WALL")                # 5. Stability > 85%
+            if len(p_matches) >= 50: badges.append("💎 VETERAN")  # 6. 50+ Games
+            if len(p_matches) < 5: badges.append("🐣 ROOKIE")     # 7. < 5 Games
+            if not last_5.empty and last_5.iloc[-1]['Winner'] == name and last_5.iloc[-1]['Loser'] in top_3 and name not in top_3:
+                badges.append("🔨 SLAYER")                        # 8. Beat Top 3
+            if p.rd > 120: badges.append("❓ UNKNOWN")            # 9. Low Stability
+            if "W W W W W" in form_str: badges.append("⚡ RAID")  # 10. Perfect Recent Form
 
-            # --- EXPERIENCE BADGES ---
-            if total_games >= 50: badges.append("💎 VETERAN")
-            elif total_games >= 20: badges.append("🎖️ SENIOR")
-            elif total_games < 5: badges.append("🐣 ROOKIE")
-
-            # --- PLAYSTYLE BADGES ---
-            # CLUTCH: Check for 2-point margin wins in history
-            clutch_count = 0
-            for _, row in p_matches.iterrows():
-                if row['Winner'] == name:
-                    try:
-                        scores = [int(x) for x in row['Score'].split('-')]
-                        if abs(scores[0] - scores[1]) <= 2:
-                            clutch_count += 1
-                    except: continue
-            if clutch_count >= 3: badges.append("🎯 CLUTCH")
-
-            # --- SYSTEM STATUS ---
-            if p.rd < 50: badges.append("🛡️ WALL")      # High Stability
-            if p.rd > 120: badges.append("❓ UNKNOWN")  # High Uncertainty
-            if i == 0: badges.append("🥇 CHAMP")         # Rank 1
-
-        # 3. CONSTRUCT ROW
         players_data.append({
             "RK": i + 1,
             "PLAYER": name.upper(),
@@ -183,140 +148,115 @@ if menu == "STANDINGS":
             "STABILITY": f"{int(100 - (p.rd/3.5))}%"
         })
 
-    # 4. RENDER
-    df_display = pd.DataFrame(players_data)
-    
-    # Custom styling for the dataframe
-    st.dataframe(
-        df_display, 
-        use_container_width=True, 
-        hide_index=True,
-        column_config={
-            "RK": st.column_config.NumberColumn("RK", format="#%d"),
-            "RATING": st.column_config.ProgressColumn("RATING", min_value=1000, max_value=2000, format="%d"),
-            "STABILITY": st.column_config.TextColumn("STABILITY"),
-            "STATUS": st.column_config.TextColumn("STATUS EFFECTS")
-        }
-    )
+    st.dataframe(pd.DataFrame(players_data), use_container_width=True, hide_index=True,
+                 column_config={"RATING": st.column_config.ProgressColumn("RATING", min_value=1000, max_value=2000, format="%d")})
+
+elif menu == "TOURNAMENT":
+    st.markdown("#### 🏆 BRACKET CONTROL")
+    if st.session_state.bracket is None:
+        t_id = st.text_input("TOURNAMENT ID", value=f"T-{datetime.now().strftime('%m%d-%H%M')}")
+        selected = st.multiselect("Select 8 Players", sorted(list(club.players.keys())))
+        if len(selected) == 8 and st.button("GENERATE BRACKET", use_container_width=True):
+            random.shuffle(selected)
+            st.session_state.bracket = {
+                "id": t_id,
+                "QF": [{"p1": selected[i], "p2": selected[i+1], "w": None} for i in range(0, 8, 2)],
+                "SF": [{"p1": "TBD", "p2": "TBD", "w": None}, {"p1": "TBD", "p2": "TBD", "w": None}],
+                "F": {"p1": "TBD", "p2": "TBD", "w": None}
+            }
+            st.rerun()
+    else:
+        if st.sidebar.button("RESET TOURNAMENT"):
+            st.session_state.bracket = None
+            st.rerun()
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.caption("QUARTERFINALS")
+            for i, match in enumerate(st.session_state.bracket["QF"]):
+                with st.container(border=True):
+                    st.write(f"**{match['p1']}** vs **{match['p2']}**")
+                    if match["w"] is None:
+                        win = st.selectbox("Winner", [match['p1'], match['p2']], key=f"qf_win_{i}")
+                        if st.button(f"Confirm QF{i+1}"):
+                            log_tournament_match(match['p1'], match['p2'], "QF", win)
+                            club.update_match(win, (match['p2'] if win == match['p1'] else match['p1']), 11, 0)
+                            st.session_state.bracket["QF"][i]["w"] = win
+                            sf_idx, slot = i // 2, ("p1" if i % 2 == 0 else "p2")
+                            st.session_state.bracket["SF"][sf_idx][slot] = win
+                            st.rerun()
+                    else: st.success(f"🏆 {match['w']}")
+
+        with col2:
+            st.caption("SEMIFINALS")
+            for i, match in enumerate(st.session_state.bracket["SF"]):
+                with st.container(border=True):
+                    st.write(f"**{match['p1']}** vs **{match['p2']}**")
+                    if match["w"] is None and "TBD" not in [match['p1'], match['p2']]:
+                        win = st.selectbox("Winner", [match['p1'], match['p2']], key=f"sf_win_{i}")
+                        if st.button(f"Confirm SF{i+1}"):
+                            log_tournament_match(match['p1'], match['p2'], "SF", win)
+                            club.update_match(win, (match['p2'] if win == match['p1'] else match['p1']), 11, 0)
+                            st.session_state.bracket["SF"][i]["w"] = win
+                            slot = "p1" if i == 0 else "p2"
+                            st.session_state.bracket["F"][slot] = win
+                            st.rerun()
+                    elif match["w"]: st.success(f"🏆 {match['w']}")
+
+        with col3:
+            st.caption("FINALS")
+            match = st.session_state.bracket["F"]
+            with st.container(border=True):
+                st.write(f"**{match['p1']}** vs **{match['p2']}**")
+                if match["w"] is None and "TBD" not in [match['p1'], match['p2']]:
+                    win = st.selectbox("Winner", [match['p1'], match['p2']], key="f_win")
+                    if st.button("Confirm Champion"):
+                        log_tournament_match(match['p1'], match['p2'], "Final", win, status="Champion Crowned")
+                        club.update_match(win, (match['p2'] if win == match['p1'] else match['p1']), 11, 0)
+                        st.session_state.bracket["F"]["w"] = win
+                        st.balloons(); st.rerun()
+                elif match["w"]: st.success(f"👑 {match['w']}")
+
+    st.markdown("---")
+    st.markdown("#### 📜 SYSTEM ARCHIVE: TOURNAMENT MATCHES")
+    st.dataframe(t_df.sort_index(ascending=False), use_container_width=True, hide_index=True)
 
 elif menu == "LOG MATCH":
     st.markdown("#### RECORD RECENT DATA")
     with st.container(border=True):
-        c1, c2 = st.columns(2)
-        with c1:
-            w_name = st.selectbox("WINNER", sorted(list(club.players.keys())))
-            w_score = st.number_input("W_PTS", min_value=0, value=11)
-        with c2:
-            l_name = st.selectbox("LOSER", sorted([p for p in club.players.keys() if p != w_name]))
-            l_score = st.number_input("L_PTS", min_value=0, value=9)
-        
+        w_name = st.selectbox("WINNER", sorted(list(club.players.keys())))
+        l_name = st.selectbox("LOSER", sorted([p for p in club.players.keys() if p != w_name]))
+        score = st.text_input("SCORE", value="11-0")
         if st.button("EXECUTE LOG", use_container_width=True):
-            # The logic in club.update_match should now handle the conn.update
-            club.update_match(w_name, l_name, w_score, l_score)
-            st.toast(f"LOGGED: {w_name.upper()} DEFEATED {l_name.upper()}")
+            new_hist = pd.DataFrame([{
+                "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "Winner": w_name, "Loser": l_name, "Score": score, "Match_Type": "Ranked"
+            }])
+            updated_h = pd.concat([h_df, new_hist], ignore_index=True)
+            conn.update(worksheet="history", data=updated_h)
+            club.update_match(w_name, l_name, 11, 0)
             st.rerun()
 
 elif menu == "PLAYER INTEL":
     st.markdown("#### SUBJECT DOSSIER")
-    search_name = st.selectbox("IDENTIFY", sorted(list(club.players.keys())))
-    p = club.players[search_name]
-    
-    # 1. LOAD DATA & SAFETY CHECKS
-    h_df = conn.read(worksheet="history", ttl=0)
-    w, l = 0, 0
-    p_matches = pd.DataFrame()
-    badges = []
-
-    if not h_df.empty and 'Winner' in h_df.columns:
-        p_matches = h_df[(h_df['Winner'] == search_name) | (h_df['Loser'] == search_name)].copy()
-        all_matches = p_matches # for badge logic
-        last_5 = p_matches.tail(5)
-        w = len(p_matches[p_matches['Winner'] == search_name])
-        l = len(p_matches[p_matches['Loser'] == search_name])
-
-        # --- 2. BADGE LOGIC (DUPLICATED FROM STANDINGS) ---
-        streak = 0
-        l_streak = 0
-        for _, row in last_5.iterrows():
-            if row['Winner'] == search_name:
-                streak += 1
-                l_streak = 0
-            else:
-                l_streak += 1
-                streak = 0
-        
-        if streak >= 3: badges.append("🔥 ON FIRE")
-        if streak >= 5: badges.append("👑 UNSTOPPABLE")
-        if l_streak >= 3: badges.append("🧊 COLD")
-        if len(all_matches) >= 50: badges.append("💎 VETERAN")
-        if p.rd < 50: badges.append("🛡️ WALL")
-        if p.rd > 120: badges.append("❓ UNKNOWN")
-        if len(all_matches) < 5: badges.append("🐣 ROOKIE")
-
-    # --- 3. DISPLAY BADGES AS TAGS ---
-    if badges:
-        badge_html = " ".join([f'<span style="background-color: #1a1a1a; border: 1px solid #58a6ff; color: #58a6ff; padding: 2px 10px; border-radius: 10px; margin-right: 5px; font-size: 12px; font-weight: bold;">{b}</span>' for b in badges])
-        st.markdown(badge_html, unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
-
-    # --- 4. METRICS ---
-    col1, col2, col3 = st.columns(3)
-    col1.metric("CURRENT RATING", int(p.rating))
-    col2.metric("RECORD", f"{w}W - {l}L")
-    col3.metric("STABILITY", f"{int(100 - (p.rd/3.5))}%")
-
-    # --- 5. PROGRESSION CHART ---
-    if not p_matches.empty:
-        progression = []
-        val = 1500
-        for _, row in p_matches.iterrows():
-            val += 15 if row['Winner'] == search_name else -12
-            progression.append(val)
-        st.line_chart(pd.DataFrame(progression, columns=["UTTR RATING"]), color="#58a6ff")
-    else:
-        st.info("No match history found for this subject.")
+    name = st.selectbox("IDENTIFY", sorted(list(club.players.keys())))
+    p = club.players[name]
+    st.metric("RATING", int(p.rating), delta=f"{int(p.rd)} RD")
+    if not h_df.empty:
+        p_matches = h_df[(h_df['Winner'] == name) | (h_df['Loser'] == name)]
+        st.write(f"RECORD: {len(p_matches[p_matches['Winner'] == name])}W - {len(p_matches[p_matches['Loser'] == name])}L")
 
 elif menu == "VERSUS":
     st.markdown("#### MATCHUP ANALYSIS")
-    p_list = sorted(list(club.players.keys()))
-    s_a = st.selectbox("SUBJECT_A", p_list)
-    s_b = st.selectbox("SUBJECT_B", [x for x in p_list if x != s_a])
-    
-    p1, p2 = club.players[s_a], club.players[s_b]
-    
-    # Win Prob Logic
-    delta = p2.rating - p1.rating
-    g = 1 / math.sqrt(1 + 3 * (math.pow(0.00046, 2) * (math.pow(p1.rd, 2) + math.pow(p2.rd, 2))) / math.pow(math.pi, 2))
-    prob_a = 1 / (1 + math.pow(10, (g * delta / 400)))
-    
-    st.progress(prob_a)
-    st.write(f"{s_a}: {int(prob_a*100)}% | {s_b}: {int((1-prob_a)*100)}%")
+    p1_n = st.selectbox("A", sorted(list(club.players.keys())))
+    p2_n = st.selectbox("B", sorted([x for x in club.players.keys() if x != p1_n]))
+    p1, p2 = club.players[p1_n], club.players[p2_n]
+    prob = 1 / (1 + math.pow(10, ((p2.rating - p1.rating) / 400)))
+    st.write(f"**{p1_n}** has a {int(prob*100)}% chance to win.")
+    st.progress(prob)
 
-    if st.button("RUN H2H"):
-        h_df = conn.read(worksheet="history", ttl=0)
-        h2h = h_df[((h_df['Winner'] == s_a) & (h_df['Loser'] == s_b)) | ((h_df['Winner'] == s_b) & (h_df['Loser'] == s_a))]
-        st.table(h2h.tail(5))
-# --- FLOATING BADGE LEGEND ---
 st.markdown('<div class="floating-legend">', unsafe_allow_html=True)
 with st.popover("📜 STATUS KEY"):
     st.markdown("### UTTR // STATUS EFFECTS")
-    st.markdown("---")
-    
-    # Define your badges here
-    legend_items = [
-        ("🔥 ON FIRE", "3+ Win Streak. High momentum."),
-        ("👑 UNSTOPPABLE", "5+ Win Streak. League leader behavior."),
-        ("🔨 SLAYER", "Defeated a Top 3 player while lower ranked."),
-        ("🎯 CLUTCH", "Won 3+ matches by exactly 2 points."),
-        ("🛡️ WALL", "Stability > 85%. Rating is firmly established."),
-        ("💎 VETERAN", "Has logged 50+ total matches."),
-        ("🎖️ SENIOR", "Has logged 20+ total matches."),
-        ("🐣 ROOKIE", "Fewer than 5 matches played."),
-        ("🧊 COLD", "3+ Loss Streak. Needs a recovery win."),
-        ("❓ UNKNOWN", "High uncertainty. Needs more matches."),
-        ("🥇 CHAMP", "The current #1 ranked player.")
-    ]
-    
-    for badge, desc in legend_items:
-        st.markdown(f"**{badge}** \n*{desc}*")
+    st.markdown("🥇 CHAMP | 🔥 ON FIRE | 👑 UNSTOPPABLE | 🧊 COLD | 🛡️ WALL | 💎 VETERAN | 🐣 ROOKIE | 🔨 SLAYER | ❓ UNKNOWN | ⚡ RAID")
 st.markdown('</div>', unsafe_allow_html=True)
