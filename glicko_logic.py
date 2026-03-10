@@ -46,23 +46,33 @@ class ClubManager:
         name = name.strip()
         if name and name not in self.players:
             self.players[name] = glicko2.Player()
-            self.save_to_cloud() # Forces the new player into the DB immediately
+            self.save_to_cloud() 
             return True
         return False
     
     def update_match(self, w_name, l_name, w_pts, l_pts):
-        """Calculates Glicko-2 shift and pushes result to the cloud."""
+        """Calculates Glicko-2 shift, checks for upsets, and pushes to cloud."""
         self.check_or_add_player(w_name)
         self.check_or_add_player(l_name)
 
+        # --- RANK CALCULATION (Fixes the NameError) ---
+        # Sort all players by rating to determine their current "Rank"
+        sorted_standings = sorted(self.players.keys(), 
+                                key=lambda x: self.players[x].rating, 
+                                reverse=True)
+        
+        # Rankings are 1-based index (e.g., Index 0 is Rank 1)
+        winner_rank = sorted_standings.index(w_name) + 1
+        loser_rank = sorted_standings.index(l_name) + 1
+
+        # --- GLICKO UPDATE ---
         winner = self.players[w_name]
         loser = self.players[l_name]
 
-        # Capture old states for the Glicko update
         w_old_r, l_old_r = winner.rating, loser.rating
         w_old_rd, l_old_rd = winner.rd, loser.rd
 
-        # Core Glicko-2 Update (1 = win, 0 = loss)
+        # Core Glicko-2 Update
         winner.update_player([l_old_r], [l_old_rd], [1])
         loser.update_player([w_old_r], [w_old_rd], [0])
 
@@ -70,9 +80,15 @@ class ClubManager:
         spread = abs(w_pts - l_pts)
         multiplier = 1 + (spread / 22) 
 
-        # Apply the multiplier to the rating change
         winner.rating += (winner.rating - w_old_r) * (multiplier - 1)
         loser.rating += (loser.rating - l_old_r) * (multiplier - 1)
+
+        # --- UPSET LOGIC ---
+        # If the winner's rank was 5+ spots lower than the loser's
+        if winner_rank > (loser_rank + 5):
+            st.balloons()
+            st.audio("https://www.myinstants.com/media/sounds/mlg-airhorn.mp3") # Optional flavor
+            st.warning(f"🚨 UPSET ALERT: Rank #{winner_rank} {w_name} just defeated Rank #{loser_rank} {l_name}!")
         
         self.save_to_cloud()
 
@@ -89,28 +105,21 @@ class ClubManager:
         
         df = pd.DataFrame(data).sort_values(by="Rating", ascending=False)
         self.conn.update(worksheet="players", data=df)
-        
-        # Clear Streamlit's internal cache so the next load_players() sees the new data
         st.cache_data.clear()
 
     def create_tournament_bracket(self, player_list):
-        """
-        Creates an 8-man seeded bracket.
-        Seeds based on current rating: 1 vs 8, 2 vs 7, 3 vs 6, 4 vs 5.
-        """
-        # Sort selected players by their current rating
+        """Creates an 8-man seeded bracket."""
         seeded = sorted(player_list, key=lambda x: self.players[x].rating, reverse=True)
         
-        # Handle cases with fewer than 8 by padding with 'BYE' (if necessary)
         while len(seeded) < 8:
             seeded.append("BYE")
 
         bracket = {
             "QF": [
-                {"p1": seeded[0], "p2": seeded[7], "w": None}, # Seed 1 vs 8
-                {"p1": seeded[3], "p2": seeded[4], "w": None}, # Seed 4 vs 5
-                {"p1": seeded[1], "p2": seeded[6], "w": None}, # Seed 2 vs 7
-                {"p1": seeded[2], "p2": seeded[5], "w": None}  # Seed 3 vs 6
+                {"p1": seeded[0], "p2": seeded[7], "w": None}, 
+                {"p1": seeded[3], "p2": seeded[4], "w": None}, 
+                {"p1": seeded[1], "p2": seeded[6], "w": None}, 
+                {"p1": seeded[2], "p2": seeded[5], "w": None}  
             ],
             "SF": [
                 {"p1": "TBD", "p2": "TBD", "w": None},

@@ -10,12 +10,44 @@ from streamlit_gsheets import GSheetsConnection
 # --- 1. INITIALIZE CONNECTION & CACHED DATA ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
+def archive_and_reset_season(season_name):
+    # 1. Load current data
+    players_df = conn.read(worksheet="players")
+    
+    # 2. Prepare Archive Data
+    # Add a column for the Season Name and the Date
+    archive_snapshot = players_df.copy()
+    archive_snapshot['Season'] = season_name
+    archive_snapshot['Date_Archived'] = datetime.now().strftime("%Y-%m-%d") # FIXED: Proper datetime formatting
+    
+    # 3. Append to Archives
+    existing_archives = conn.read(worksheet="archives")
+    updated_archives = pd.concat([existing_archives, archive_snapshot], ignore_index=True)
+    conn.update(worksheet="archives", data=updated_archives)
+    
+    # 4. Reset Players for New Season
+    # We keep the names but reset stats to baseline
+    reset_players = players_df.copy()
+    reset_players['Rating'] = 1500
+    reset_players['RD'] = 350
+    reset_players['Volatility'] = 0.06
+    reset_players['Wins'] = 0
+    reset_players['Losses'] = 0
+    
+    conn.update(worksheet="players", data=reset_players)
+    
+    # 5. Clear Match History
+    # We create an empty dataframe with the same columns to wipe the history sheet
+    history_columns = conn.read(worksheet="history").columns
+    empty_history = pd.DataFrame(columns=history_columns)
+    conn.update(worksheet="history", data=empty_history)
+
 def load_data():
     try:
-        h_df = conn.read(worksheet="history", ttl=2) 
-        p_df = conn.read(worksheet="players", ttl=60)
+        h_df = conn.read(worksheet="history", ttl=600) 
+        p_df = conn.read(worksheet="players", ttl=600)
         try:
-            t_df = conn.read(worksheet="tournament_matches", ttl=2)
+            t_df = conn.read(worksheet="tournament_matches", ttl=600)
         except:
             t_df = pd.DataFrame(columns=["Tournament_ID", "Player_A", "Player_B", "Round", "Winner", "Status"])
         return h_df, p_df, t_df
@@ -92,25 +124,49 @@ def log_tournament_match(p1, p2, round_name, winner, status="Completed"):
     updated_h = pd.concat([h_df, new_h_row], ignore_index=True)
     conn.update(worksheet="history", data=updated_h)
 
-# --- 5. SIDEBAR ---
+# --- 5. SIDEBAR & ADMIN CHECK ---
 with st.sidebar:
     st.markdown("### UTTR // NAV")
-    menu = st.radio("", ["STANDINGS", "TOURNAMENT", "LOG MATCH", "PLAYER INTEL", "VERSUS"])
+    
+    # Password Protection for Admin Tools
+    admin_key = st.text_input("Admin Key", type="password")
+    is_admin = (admin_key == "ccpingpong") # Change "ccpingpong" to your preferred password
+
+    menu = st.radio("", ["STANDINGS", "TOURNAMENT", "LOG MATCH", "PLAYER INTEL", "VERSUS", "HALL OF FAME"])
+    
     st.markdown("---")
-    with st.expander("REGISTER NEW SUBJECT"):
-        new_name = st.text_input("NAME")
-        if st.button("INITIALIZE"):
-            if new_name and club.add_new_player(new_name):
-                st.success("SUCCESS"); st.rerun()
+    
+    # Only show registration to admins
+    if is_admin:
+        with st.expander("REGISTER NEW SUBJECT"):
+            new_name = st.text_input("NAME")
+            if st.button("INITIALIZE"):
+                if new_name and club.add_new_player(new_name):
+                    st.success("SUCCESS"); st.rerun()
+    else:
+        st.info("Enter Admin Key to unlock registration & reset tools.")
+        
     st.caption("CORE_V4.2 // NOVI_MI")
 
-st.markdown(f'<div class="header-section"><p class="sub-title">Detroit Catholic Central</p><p class="main-title">UTTR</p></div>', unsafe_allow_html=True)
-
+# --- 6. ADMIN UI (Season Management) ---
+# This appears right above the main title ONLY if the password is correct
+if is_admin:
+    with st.expander("🛠️ Admin: Season Management"):
+        st.warning("This action will archive all current standings and reset everyone to 1500.")
+        season_input = st.text_input("New Season Name", placeholder="e.g. Spring 2024")
+        confirm_check = st.checkbox("I confirm I want to end the current season.")
+        
+        if st.button("🚀 End Season and Archive"):
+            if confirm_check and season_input:
+                archive_and_reset_season(season_input)
+                st.success(f"Season '{season_input}' archived! All players reset.")
+                st.rerun()
+            else:
+                st.error("Please provide a season name and check the confirmation box.")
 # --- 6. NAVIGATION LOGIC ---
 if menu == "STANDINGS":
     st.markdown("#### LEAGUE TABLE")
     sorted_players = sorted(club.players.items(), key=lambda x: x[1].rating, reverse=True)
-    # Changed top_3_names to top_3 to match your badge logic below
     top_3 = [x[0] for x in sorted_players[:3]]
     players_data = []
 
@@ -157,7 +213,7 @@ if menu == "STANDINGS":
         hide_index=True,
         column_config={
             "RATING": st.column_config.ProgressColumn(
-                "RATING", min_value=1000, max_value=2000, format="%d"
+                "RATING", min_value=1000, max_value=2500, format="%d" # FIXED: Bumped max_value to 2500 so it doesn't break
             )
         }
     )
@@ -168,99 +224,96 @@ if menu == "STANDINGS":
     if all_ratings:
         rating_counts = pd.Series(all_ratings).value_counts().sort_index()
         st.bar_chart(rating_counts)
+
 elif menu == "TOURNAMENT":
     st.markdown("#### 🏆 BRACKET CONTROL")
     if st.session_state.bracket is None:
-        t_id = st.text_input("TOURNAMENT ID", value=f"T-{datetime.now().strftime('%m%d-%H%M')}")
-        selected = st.multiselect("Select 8 Players", sorted(list(club.players.keys())))
-        if len(selected) == 8 and st.button("GENERATE SEEDED BRACKET", use_container_width=True):
-            # 1. Sort players by rating (Highest to Lowest)
-            seeded = sorted(selected, key=lambda x: club.players[x].rating, reverse=True)
-            
-            # 2. Create standard tournament pairings (1v8, 4v5, 2v7, 3v6)
-            # This follows a standard Quarterfinal layout
-            pairings = [
-                (seeded[0], seeded[7]), # Match 1: 1st vs 8th
-                (seeded[3], seeded[4]), # Match 2: 4th vs 5th
-                (seeded[1], seeded[6]), # Match 3: 2nd vs 7th
-                (seeded[2], seeded[5])  # Match 4: 3rd vs 6th
-            ]
-            
-            st.session_state.bracket = {
-                "id": t_id,
-                "QF": [{"p1": p1, "p2": p2, "w": None} for p1, p2 in pairings],
-                "SF": [{"p1": "TBD", "p2": "TBD", "w": None}, {"p1": "TBD", "p2": "TBD", "w": None}],
-                "F": {"p1": "TBD", "p2": "TBD", "w": None}
-            }
-            st.rerun()
+        if is_admin:
+            t_id = st.text_input("TOURNAMENT ID", value=f"T-{datetime.now().strftime('%m%d-%H%M')}")
+            selected = st.multiselect("Select 8 Players", sorted(list(club.players.keys())))
+            if len(selected) == 8 and st.button("GENERATE SEEDED BRACKET", use_container_width=True):
+                seeded = sorted(selected, key=lambda x: club.players[x].rating, reverse=True)
+                pairings = [(seeded[0], seeded[7]), (seeded[3], seeded[4]), (seeded[1], seeded[6]), (seeded[2], seeded[5])]
+                st.session_state.bracket = {"id": t_id, "QF": [{"p1": p1, "p2": p2, "w": None} for p1, p2 in pairings], "SF": [{"p1": "TBD", "p2": "TBD", "w": None}, {"p1": "TBD", "p2": "TBD", "w": None}], "F": {"p1": "TBD", "p2": "TBD", "w": None}}
+                st.rerun()
+        else:
+            st.warning("No active tournament. Admin key required to start one.")
     else:
-        if st.sidebar.button("RESET TOURNAMENT"):
+        if is_admin and st.sidebar.button("RESET TOURNAMENT"):
             st.session_state.bracket = None
             st.rerun()
 
         col1, col2, col3 = st.columns(3)
+        # Quarterfinals
         with col1:
             st.caption("QUARTERFINALS")
-            for i, match in enumerate(st.session_state.bracket["QF"]):
+            for i, m in enumerate(st.session_state.bracket["QF"]):
                 with st.container(border=True):
-                    st.write(f"**{match['p1']}** vs **{match['p2']}**")
-                    if match["w"] is None:
-                        win = st.selectbox("Winner", [match['p1'], match['p2']], key=f"qf_win_{i}")
-                        if st.button(f"Confirm QF{i+1}"):
-                            log_tournament_match(match['p1'], match['p2'], "QF", win)
-                            club.update_match(win, (match['p2'] if win == match['p1'] else match['p1']), 11, 0)
-                            st.session_state.bracket["QF"][i]["w"] = win
-                            sf_idx, slot = i // 2, ("p1" if i % 2 == 0 else "p2")
-                            st.session_state.bracket["SF"][sf_idx][slot] = win
-                            st.rerun()
-                    else: st.success(f"🏆 {match['w']}")
-
+                    st.write(f"**{m['p1']}** vs **{m['p2']}**")
+                    if m["w"] is None:
+                        if is_admin:
+                            win = st.selectbox("Winner", [m['p1'], m['p2']], key=f"qf_{i}")
+                            if st.button(f"Confirm QF{i+1}"):
+                                log_tournament_match(m['p1'], m['p2'], "QF", win)
+                                club.update_match(win, (m['p2'] if win == m['p1'] else m['p1']), 11, 0)
+                                st.session_state.bracket["QF"][i]["w"] = win
+                                sf_idx, slot = i // 2, ("p1" if i % 2 == 0 else "p2")
+                                st.session_state.bracket["SF"][sf_idx][slot] = win
+                                st.rerun()
+                        else: st.info("Match in progress...")
+                    else: st.success(f"🏆 {m['w']}")
+        
+        # Semifinals
         with col2:
             st.caption("SEMIFINALS")
-            for i, match in enumerate(st.session_state.bracket["SF"]):
+            for i, m in enumerate(st.session_state.bracket["SF"]):
                 with st.container(border=True):
-                    st.write(f"**{match['p1']}** vs **{match['p2']}**")
-                    if match["w"] is None and "TBD" not in [match['p1'], match['p2']]:
-                        win = st.selectbox("Winner", [match['p1'], match['p2']], key=f"sf_win_{i}")
-                        if st.button(f"Confirm SF{i+1}"):
-                            log_tournament_match(match['p1'], match['p2'], "SF", win)
-                            club.update_match(win, (match['p2'] if win == match['p1'] else match['p1']), 11, 0)
-                            st.session_state.bracket["SF"][i]["w"] = win
-                            slot = "p1" if i == 0 else "p2"
-                            st.session_state.bracket["F"][slot] = win
-                            st.rerun()
-                    elif match["w"]: st.success(f"🏆 {match['w']}")
+                    st.write(f"**{m['p1']}** vs **{m['p2']}**")
+                    if m["w"] is None and "TBD" not in [m['p1'], m['p2']]:
+                        if is_admin:
+                            win = st.selectbox("Winner", [m['p1'], m['p2']], key=f"sf_{i}")
+                            if st.button(f"Confirm SF{i+1}"):
+                                log_tournament_match(m['p1'], m['p2'], "SF", win)
+                                club.update_match(win, (m['p2'] if win == m['p1'] else m['p1']), 11, 0)
+                                st.session_state.bracket["SF"][i]["w"] = win
+                                st.session_state.bracket["F"]["p1" if i == 0 else "p2"] = win
+                                st.rerun()
+                        else: st.info("Match in progress...")
+                    elif m["w"]: st.success(f"🏆 {m['w']}")
 
+        # Finals
         with col3:
             st.caption("FINALS")
-            match = st.session_state.bracket["F"]
+            m = st.session_state.bracket["F"]
             with st.container(border=True):
-                st.write(f"**{match['p1']}** vs **{match['p2']}**")
-                if match["w"] is None and "TBD" not in [match['p1'], match['p2']]:
-                    win = st.selectbox("Winner", [match['p1'], match['p2']], key="f_win")
-                    if st.button("Confirm Champion"):
-                        log_tournament_match(match['p1'], match['p2'], "Final", win, status="Champion Crowned")
-                        club.update_match(win, (match['p2'] if win == match['p1'] else match['p1']), 11, 0)
-                        st.session_state.bracket["F"]["w"] = win
-                        st.balloons(); st.rerun()
-                elif match["w"]: st.success(f"👑 {match['w']}")
+                st.write(f"**{m['p1']}** vs **{m['p2']}**")
+                if m["w"] is None and "TBD" not in [m['p1'], m['p2']]:
+                    if is_admin:
+                        win = st.selectbox("Winner", [m['p1'], m['p2']], key="f_win")
+                        if st.button("Confirm Champion"):
+                            log_tournament_match(m['p1'], m['p2'], "Final", win, "Champion Crowned")
+                            club.update_match(win, (m['p2'] if win == m['p1'] else m['p1']), 11, 0)
+                            st.session_state.bracket["F"]["w"] = win
+                            st.balloons(); st.rerun()
+                    else: st.info("Match in progress...")
+                elif m["w"]: st.success(f"👑 {m['w']}")
 
     st.markdown("---")
     st.markdown("#### 📜 SYSTEM ARCHIVE: TOURNAMENT MATCHES")
     st.dataframe(t_df.sort_index(ascending=False), use_container_width=True, hide_index=True)
-
 elif menu == "LOG MATCH":
     st.markdown("#### RECORD RECENT DATA")
-    with st.container(border=True):
-        w_name = st.selectbox("WINNER", sorted(list(club.players.keys())))
-        l_name = st.selectbox("LOSER", sorted([p for p in club.players.keys() if p != w_name]))
-        score = st.text_input("SCORE", value="11-0")
-        if st.button("EXECUTE LOG", use_container_width=True):
-            # club.update_match already handles the Glicko math AND the cloud save
-            club.update_match(w_name, l_name, 11, 0) 
-            st.success(f"MATCH ARCHIVED: {w_name} DEFEATED {l_name}")
-            st.rerun()
-
+    if is_admin:
+        with st.container(border=True):
+            w_name = st.selectbox("WINNER", sorted(list(club.players.keys())))
+            l_name = st.selectbox("LOSER", sorted([p for p in club.players.keys() if p != w_name]))
+            score = st.text_input("SCORE", value="11-0")
+            if st.button("EXECUTE LOG", use_container_width=True):
+                club.update_match(w_name, l_name, 11, 0) 
+                st.success(f"MATCH ARCHIVED: {w_name} DEFEATED {l_name}")
+                st.rerun()
+    else:
+        st.warning("Admin Key required to log match results.")
 elif menu == "PLAYER INTEL":
     st.markdown("#### SUBJECT DOSSIER")
     name = st.selectbox("IDENTIFY", sorted(list(club.players.keys())))
@@ -327,6 +380,35 @@ elif menu == "VERSUS":
             "Wins": [p1_h2h_wins, p2_h2h_wins]
         })
         st.bar_chart(chart_data.set_index("Player"))
+        
+elif menu == "HALL OF FAME":
+    st.markdown("#### 🏛️ ARCHIVED SEASON RECORDS")
+    
+    # 1. Load Archive Data
+    archive_df = conn.read(worksheet="archives")
+    
+    if archive_df.empty:
+        st.info("No archived seasons found. Finish a season to see history here!")
+    else:
+        # 2. Season Selector
+        seasons = archive_df['Season'].unique()
+        selected_season = st.selectbox("Select Season", seasons)
+        
+        # 3. Filter and Display
+        season_data = archive_df[archive_df['Season'] == selected_season].sort_values(by="Rating", ascending=False)
+        
+        # 4. Display Podium
+        top_3 = season_data.head(3)
+        cols = st.columns(3)
+        podium_titles = ["🥇 1st Place", "🥈 2nd Place", "🥉 3rd Place"]
+        
+        for i, col in enumerate(cols):
+            if i < len(top_3):
+                with col:
+                    st.metric(podium_titles[i], top_3.iloc[i]['Name'], f"{int(top_3.iloc[i]['Rating'])} pts")
+
+        st.markdown("---")
+        st.dataframe(season_data, use_container_width=True, hide_index=True)
 
 st.markdown('<div class="floating-legend">', unsafe_allow_html=True)
 with st.popover("📜 STATUS KEY"):
