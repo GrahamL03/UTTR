@@ -8,12 +8,12 @@ UTTR (Universal Table Tennis Rankings) is a professional-grade league management
 
 ## Technical Architecture
 
-The system is built on a high-concurrency, cloud-synchronized architecture:
+The system is built on a high-concurrency, cloud-synchronized architecture designed for low latency and data integrity:
 
-* **Logic Engine:** Implementation of the Glicko-2 algorithm, accounting for Rating Deviation (RD) and Volatility ($\sigma$).
-* **Data Layer:** Real-time integration with Google Sheets via `st.connection`, serving as a distributed database.
-* **Interface:** Streamlit-driven SPA (Single Page Application) with custom CSS injection for high-contrast, low-latency navigation.
-* **Predictive Modeling:** Logistic distribution functions used to calculate win probabilities for any given matchup.
+* **Logic Engine:** A custom implementation of the Glicko-2 algorithm, accounting for Rating Deviation (RD) and Volatility ($\sigma$).
+* **Data Layer:** Real-time integration with Google Sheets API via `streamlit-gsheets`, serving as a distributed database for cross-device synchronization.
+* **Interface:** A Streamlit-driven Single Page Application (SPA) utilizing custom CSS injection to provide a high-contrast, professional-grade user interface.
+* **Predictive Modeling:** Logistic distribution functions used to calculate win probabilities for any given matchup based on historical performance data.
 
 ---
 
@@ -37,7 +37,6 @@ $$v = \left[ \sum_{j=1}^{m} g(\phi_j)^2 E(\mu, \mu_j, \phi_j) (1 - E(\mu, \mu_j,
 
 Where $g(\phi)$ is a weighting function:
 
-
 $$g(\phi) = \frac{1}{\sqrt{1 + 3\phi^2 / \pi^2}}$$
 
 ### 3. Win Probability Calculation
@@ -45,8 +44,6 @@ $$g(\phi) = \frac{1}{\sqrt{1 + 3\phi^2 / \pi^2}}$$
 The expected outcome $E$ (win probability) between Player A and Player B is calculated using a logistic curve:
 
 $$E = \frac{1}{1 + e^{-g(\phi_j)(\mu - \mu_j)}}$$
-
-In the "Versus" module, this is presented as a percentage to represent the statistical favorite.
 
 ### 4. Dominant Win Multiplier
 
@@ -64,7 +61,7 @@ Unlike traditional Elo systems, UTTR measures three distinct variables for every
 
 * **Rating:** The estimated skill level (standardized at 1500 for new subjects).
 * **Rating Deviation (RD):** The degree of certainty the system has in a player's rank. High RD indicates "Unknown" status; low RD indicates a "Stable" rank.
-* **Volatility:** The degree of expected fluctuation in a player's performance.
+* **Volatility:** The degree of expected fluctuation in a player's performance over time.
 
 ### 2. Tournament Bracket Control
 
@@ -77,27 +74,29 @@ The system features an automated 8-man bracket generator. Matches are seeded to 
 
 ## System Status Key
 
-The platform utilizes a dynamic badge system to signify performance milestones:
+The platform utilizes a dynamic badge system to signify performance milestones and statistical outliers:
 
 | Badge | Criteria |
 | --- | --- |
-| 🥇 CHAMP | Occupies the Rank 1 position in the league. |
+| 🥇 CHAMP | Occupies the Rank 1 position in the league standings. |
+| 😤 DOMINANT | Secured the last 3 match victories by a point spread greater than 6. |
 | 🔥 ON FIRE | Achieved 3 consecutive match victories. |
-| 👑 UNSTOPPABLE | Achieved 5+ consecutive match victories. |
-| 🛡️ WALL | RD is below 50, signifying a highly stable rank. |
+| 👑 UNSTOPPABLE | Achieved 5 or more consecutive match victories. |
+| 🛡️ WALL | RD is below 50, signifying a highly stable and verified rank. |
 | 🔨 SLAYER | A non-top 3 player who defeated a Top 3 opponent. |
 | 💎 VETERAN | Logged a minimum of 50 competitive matches. |
 | 🐣 ROOKIE | Logged fewer than 5 competitive matches. |
-| 🧊 COLD | Sustained 3+ consecutive match losses. |
-| ⚡ RAID | Maintained a perfect 5-0 record over the last 5 matches. |
-| ❓ UNKNOWN | RD exceeds 120, requiring more data for an accurate rank. |
-| 😤  Dominant | Last 3 matches have been won by 6 or more. |
+| 🧊 COLD | Sustained 3 or more consecutive match losses. |
+| ⚡ RAID | Maintained a perfect 5-0 record over the most recent 5 matches. |
+| ❓ UNKNOWN | RD exceeds 120, requiring more data for an accurate assessment. |
 
 ---
 
 ## Installation and Deployment
 
 ### Dependency Installation
+
+To set up the local environment, install the required packages:
 
 ```bash
 pip install streamlit pandas streamlit-gsheets glicko2
@@ -106,6 +105,8 @@ pip install streamlit pandas streamlit-gsheets glicko2
 
 ### Execution
 
+Run the application via the Streamlit CLI:
+
 ```bash
 streamlit run app.py
 
@@ -113,5 +114,8 @@ streamlit run app.py
 
 ---
 
-**Document Revision:** 4.2.0
+**Document Revision:** 4.2.1
+
 **Environment:** NOVI_MI // Detroit Catholic Central
+
+**Developer:** G. Long
