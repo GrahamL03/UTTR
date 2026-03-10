@@ -14,7 +14,6 @@ class ClubManager:
     def load_players(self):
         """Pulls the latest ratings from Google Sheets with 0 cache to prevent ghosting."""
         try:
-            # ttl=0 is critical during development so you see updates instantly
             df = self.conn.read(worksheet="players", ttl=0)
             if df is not None and not df.empty:
                 self.players = {}

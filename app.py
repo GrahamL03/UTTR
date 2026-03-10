@@ -6,6 +6,7 @@ import random
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
 
+
 # --- 1. INITIALIZE CONNECTION & CACHED DATA ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
