@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import os
 from glicko_logic import ClubManager
+import math
+
 
 # --- INITIALIZE ---
 if 'club' not in st.session_state:
@@ -224,7 +226,6 @@ elif menu == "VERSUS":
     p2 = club.players[s_b]
     
     # Glicko-2 Win Probability Formula
-    import math
     def win_probability(player, opponent):
         delta_rating = opponent.rating - player.rating
         # Scale factor for Glicko-2
