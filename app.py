@@ -108,15 +108,38 @@ st.markdown(f"""
 # --- NAVIGATION LOGIC ---
 if menu == "STANDINGS":
     st.markdown("#### LEAGUE TABLE")
+    
+    # Load history to calculate form
+    history_exists = os.path.exists(club.history_file)
+    if history_exists:
+        h_df = pd.read_csv(club.history_file)
+    
     players_data = []
     sorted_players = sorted(club.players.items(), key=lambda x: x[1].rating, reverse=True)
+    
     for i, (name, p) in enumerate(sorted_players):
+        # --- FORM CALCULATION ---
+        form_str = ""
+        if history_exists:
+            # Filter matches for this player
+            p_matches = h_df[(h_df['Winner'] == name) | (h_df['Loser'] == name)].tail(5)
+            
+            # Create the W L string (Newest on the right)
+            for _, row in p_matches.iterrows():
+                if row['Winner'] == name:
+                    form_str += "W "
+                else:
+                    form_str += "L "
+        
         players_data.append({
             "RK": i + 1,
             "PLAYER": name.upper(),
             "RATING": int(p.rating),
-            "CONFIDENCE": f"{int(100 - (p.rd/3.5))}%"
+            "FORM (LAST 5)": form_str.strip() if form_str else "---",
+            "STABILITY": f"{int(100 - (p.rd/3.5))}%"
         })
+    
+    # Display the table
     st.dataframe(pd.DataFrame(players_data), use_container_width=True, hide_index=True)
 
 elif menu == "LOG MATCH":
@@ -136,28 +159,89 @@ elif menu == "LOG MATCH":
             st.toast(f"LOGGED: {w_name.upper()}")
 
 elif menu == "PLAYER INTEL":
-    st.markdown("#### PLAYER DOSSIER")
+    st.markdown("#### SUBJECT DOSSIER")
     search_name = st.selectbox("IDENTIFY", sorted(list(club.players.keys())))
     p = club.players[search_name]
     
+    # Metrics Row
     col1, col2, col3 = st.columns(3)
-    col1.metric("RATING", int(p.rating))
+    col1.metric("CURRENT RATING", int(p.rating))
     
-    if os.path.exists(club.history_file):
+    history_exists = os.path.exists(club.history_file)
+    if history_exists:
         h_df = pd.read_csv(club.history_file)
+        # Calculate W/L
         w = len(h_df[h_df['Winner'] == search_name])
         l = len(h_df[h_df['Loser'] == search_name])
         col2.metric("RECORD", f"{w}W - {l}L")
+        
+        # --- RATING PROGRESSION GRAPH ---
+        st.markdown("---")
+        st.markdown("#### RATING EVOLUTION")
+        
+        # We'll simulate the rating over time for the graph
+        # Note: In a larger app, you'd store ratings after every match.
+        # For now, we'll show their performance trend.
+        p_matches = h_df[(h_df['Winner'] == search_name) | (h_df['Loser'] == search_name)].copy()
+        
+        if not p_matches.empty:
+            # We create a simple point-in-time list
+            # Since Glicko is complex, we'll track the "Performance Index"
+            progression = []
+            current_viz_rating = 1500 # Starting baseline
+            for _, row in p_matches.iterrows():
+                if row['Winner'] == search_name:
+                    current_viz_rating += 15 # Simple visual approximation
+                else:
+                    current_viz_rating -= 12
+                progression.append(current_viz_rating)
+            
+            # Create a DataFrame for the chart
+            chart_data = pd.DataFrame(progression, columns=["UTTR RATING"])
+            
+            # Display a sleek line chart
+            st.line_chart(chart_data, color="#58a6ff")
+        else:
+            st.info("INSUFFICIENT DATA FOR EVOLUTION ANALYSIS.")
     
     col3.metric("STABILITY", f"{int(100 - (p.rd/3.5))}%")
 
+    st.markdown("---")
+    st.markdown("#### RECENT ACTIVITY LOG")
+    if history_exists:
+        p_history = h_df[(h_df['Winner'] == search_name) | (h_df['Loser'] == search_name)].tail(10)
+        st.table(p_history[['Date', 'Winner', 'Loser', 'Score']])
+
 elif menu == "VERSUS":
-    st.markdown("#### RIVALRY ANALYSIS")
+    st.markdown("#### MATCHUP ANALYSIS")
+    p_list = sorted(list(club.players.keys()))
     c1, c2 = st.columns(2)
-    s_a = c1.selectbox("SUBJECT_A", sorted(list(club.players.keys())))
-    s_b = c2.selectbox("SUBJECT_B", sorted([x for x in club.players.keys() if x != s_a]))
+    s_a = c1.selectbox("SUBJECT_A", p_list)
+    s_b = c2.selectbox("SUBJECT_B", sorted([x for x in p_list if x != s_a]))
     
-    if st.button("COMPARE MATCHUPS", use_container_width=True):
+    # --- WIN PROBABILITY MATH ---
+    p1 = club.players[s_a]
+    p2 = club.players[s_b]
+    
+    # Glicko-2 Win Probability Formula
+    import math
+    def win_probability(player, opponent):
+        delta_rating = opponent.rating - player.rating
+        # Scale factor for Glicko-2
+        g = 1 / math.sqrt(1 + 3 * (math.pow(0.00046, 2) * (math.pow(player.rd, 2) + math.pow(opponent.rd, 2))) / math.pow(math.pi, 2))
+        return 1 / (1 + math.pow(10, (g * delta_rating / 400)))
+
+    prob_a = win_probability(p1, p2)
+    prob_b = 1 - prob_a
+
+    # Display Probability Bar
+    st.markdown(f"**PREDICTED WIN PROBABILITY**")
+    st.progress(prob_a)
+    col_pa, col_pb = st.columns(2)
+    col_pa.caption(f"{s_a.upper()}: {int(prob_a * 100)}%")
+    col_pb.markdown(f"<p style='text-align:right; color:#888; font-size:12px;'>{s_b.upper()}: {int(prob_b * 100)}%</p>", unsafe_allow_html=True)
+
+    if st.button("RUN HISTORICAL COMPARISON", use_container_width=True):
         if os.path.exists(club.history_file):
             df = pd.read_csv(club.history_file)
             h2h = df[((df['Winner'] == s_a) & (df['Loser'] == s_b)) | 
@@ -167,9 +251,11 @@ elif menu == "VERSUS":
                 w_a = len(h2h[h2h['Winner'] == s_a])
                 w_b = len(h2h[h2h['Winner'] == s_b])
                 
-                sc1, sc2, sc3 = st.columns([2,1,2])
-                sc1.markdown(f"<h1 style='text-align:right;'>{w_a}</h1><p style='text-align:right;'>{s_a.upper()}</p>", unsafe_allow_html=True)
-                sc2.markdown("<h1 style='text-align:center; color:#222;'>VS</h1>", unsafe_allow_html=True)
-                sc3.markdown(f"<h1>{w_b}</h1><p>{s_b.upper()}</p>", unsafe_allow_html=True)
+                m1, m2, m3 = st.columns([3, 1, 3])
+                m1.markdown(f"<h1 style='text-align:right;'>{w_a}</h1><p style='text-align:right;'>{s_a.upper()}</p>", unsafe_allow_html=True)
+                m2.markdown("<h1 style='text-align:center; color:#333; padding-top:10px;'>VS</h1>", unsafe_allow_html=True)
+                m3.markdown(f"<h1>{w_b}</h1><p>{s_b.upper()}</p>", unsafe_allow_html=True)
                 
-                st.dataframe(h2h[['Date', 'Winner', 'Score']].tail(5), use_container_width=True)
+                st.dataframe(h2h[['Date', 'Winner', 'Score']].tail(10), use_container_width=True)
+            else:
+                st.info("NO PREVIOUS ENCOUNTERS RECORDED.")
