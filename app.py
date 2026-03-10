@@ -4,9 +4,20 @@ from glicko_logic import ClubManager
 import math
 from streamlit_gsheets import GSheetsConnection
 
-# --- INITIALIZE CONNECTION ---
-# Strip out the spreadsheet= part
-conn = st.connection("gsheets", type=GSheetsConnection)# --- INITIALIZE CLUB LOGIC ---
+# --- 1. INITIALIZE CONNECTION FIRST ---
+# We need the connection BEFORE we can read the data
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+# --- 2. GLOBAL DATA LOAD (SPEED BOOST) ---
+# We use ttl=60 so it caches for 1 minute
+try:
+    h_df = conn.read(worksheet="history", ttl=60)
+    p_df = conn.read(worksheet="players", ttl=60)
+except:
+    h_df = pd.DataFrame()
+    p_df = pd.DataFrame()
+
+# --- 3. INITIALIZE CLUB LOGIC ---
 if 'club' not in st.session_state:
     st.session_state.club = ClubManager()
 club = st.session_state.club
@@ -17,8 +28,6 @@ st.set_page_config(
     layout="wide", 
     initial_sidebar_state="expanded"
 )
-
-# --- CSS: FORCED DARK + OMBRE BANNER ---
 st.markdown("""
     <style>
     html, body, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
