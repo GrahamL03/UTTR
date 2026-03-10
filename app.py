@@ -287,14 +287,19 @@ elif menu == "STANDINGS":
     
     if all_ratings:
         df_dist = pd.DataFrame(all_ratings, columns=['Rating'])
-        # Cluster into 100-point buckets
-        df_dist['Tier'] = (df_dist['Rating'] // 100) * 100
-        df_dist['Range'] = df_dist['Tier'].apply(lambda x: f"{x}-{x+99}")
+        
+        # Cluster into 250-point buckets
+        # (Rating // 250) * 250 finds the floor of the 250-block
+        df_dist['Tier'] = (df_dist['Rating'] // 250) * 250
+        
+        # Create the label (e.g., 1000-1249)
+        df_dist['Range'] = df_dist['Tier'].apply(lambda x: f"{int(x)}-{int(x+249)}")
         
         # Count players per tier and sort numerically
         dist_counts = df_dist.groupby(['Tier', 'Range']).size().reset_index(name='Players')
         dist_counts = dist_counts.sort_values('Tier')
         
+        # Render the chart
         st.bar_chart(dist_counts.set_index('Range')['Players'])
 elif menu == "TOURNAMENT":
     st.markdown("#### 🏆 BRACKET CONTROL")
