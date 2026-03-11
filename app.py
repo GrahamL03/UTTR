@@ -57,6 +57,16 @@ def load_data():
 
 h_df, p_df, t_df = load_data()
 
+def get_current_season():
+    try:
+        archive_df = conn.read(worksheet="archives", ttl=600)
+        if not archive_df.empty:
+            # Gets the very last season name added to the archives
+            return archive_df['Season'].iloc[-1]
+        return "Inaugural Season"
+    except:
+        return "Active Season"
+
 # --- 2. INITIALIZE CLUB LOGIC ---
 if 'club' not in st.session_state:
     st.session_state.club = ClubManager()
@@ -162,6 +172,9 @@ def log_tournament_match(p1, p2, round_name, winner, status="Completed"):
 
 # --- 5. SIDEBAR & ADMIN CHECK ---
 with st.sidebar:
+    st.subheader(f"🏆 {get_current_season()}")
+    st.markdown("---")
+    # ... rest of your sidebar code
     st.markdown("### UTTR // NAV")
     
     # Password Protection for Admin Tools
@@ -458,7 +471,7 @@ elif menu == "VERSUS":
         st.bar_chart(chart_data.set_index("Player"))
         
 elif menu == "HALL OF FAME":
-    st.markdown("#### 🏛️ ARCHIVED SEASON RECORDS")
+    st.markdown("#### 🏛️ SEASON RECORDS")
     
     # 1. Load Archive Data
     archive_df = conn.read(worksheet="archives")
