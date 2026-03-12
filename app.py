@@ -174,15 +174,13 @@ def log_tournament_match(p1, p2, round_name, winner, status="Completed"):
 with st.sidebar:
     st.subheader(f"🏆 {get_current_season()}")
     st.markdown("---")
-    # ... rest of your sidebar code
     st.markdown("### UTTR // NAV")
     
     # Password Protection for Admin Tools
     admin_key = st.text_input("Admin Key", type="password")
     is_admin = (admin_key == "ccpingpong") # Change "ccpingpong" to your preferred password
 
-    menu = st.radio("", ["STANDINGS", "TOURNAMENT", "LOG MATCH", "PLAYER INTEL", "VERSUS", "HALL OF FAME"])
-    
+    menu = st.radio("", ["STANDINGS", "TOURNAMENT", "LOG MATCH", "PLAYER INTEL", "VERSUS", "HALL OF FAME", "ADMIN SETTINGS"])    
     st.markdown("---")
     
     # Only show registration to admins
@@ -197,22 +195,29 @@ with st.sidebar:
         
     st.caption("CORE_V4.2 // NOVI_MI")
 
-# --- 6. ADMIN UI (Season Management) ---
-# This appears right above the main title ONLY if the password is correct
-if is_admin:
-    with st.expander("🛠️ Admin: Season Management"):
-        st.warning("This action will archive all current standings and reset everyone to 1500.")
-        season_input = st.text_input("New Season Name", placeholder="e.g. Spring 2024")
-        confirm_check = st.checkbox("I confirm I want to end the current season.")
-        
-        if st.button("🚀 End Season and Archive"):
-            if confirm_check and season_input:
-                archive_and_reset_season(season_input)
-                st.success(f"Season '{season_input}' archived! All players reset.")
-                st.rerun()
-            else:
-                st.error("Please provide a season name and check the confirmation box.")
 # --- 6. NAVIGATION LOGIC ---
+if menu == "ADMIN SETTINGS":
+    st.markdown("#### ⚙️ CORE SYSTEM CONTROL")
+    if is_admin:
+        with st.container(border=True):
+            st.subheader("🏁 Season Transition")
+            st.write(f"Current Phase: **{get_current_season()}**")
+            st.warning("Ending the season will archive current ratings and reset everyone to 1500.")
+            
+            season_input = st.text_input("NEW SEASON NAME", placeholder="e.g. Spring 2026")
+            confirm_check = st.checkbox("I confirm I want to wipe the current leaderboard.")
+            
+            if st.button("🚀 EXECUTE ARCHIVE & RESET", use_container_width=True):
+                if confirm_check and season_input:
+                    with st.spinner("Archiving data..."):
+                        archive_and_reset_season(season_input)
+                    st.success(f"SEASON {season_input} INITIALIZED.")
+                    st.balloons()
+                    st.rerun()
+                else:
+                    st.error("Action Required: Provide a name and check the confirmation box.")
+    else:
+        st.warning("Admin Key required to access system settings.")
 elif menu == "STANDINGS":
     st.markdown("#### LEAGUE TABLE")
     sorted_players = sorted(club.players.items(), key=lambda x: x[1].rating, reverse=True)
@@ -396,11 +401,40 @@ elif menu == "LOG MATCH":
         with st.container(border=True):
             w_name = st.selectbox("WINNER", sorted(list(club.players.keys())))
             l_name = st.selectbox("LOSER", sorted([p for p in club.players.keys() if p != w_name]))
-            score = st.text_input("SCORE", value="11-0")
+            
+            # Help the admin with a format reminder
+            score_raw = st.text_input("SCORE (Winner-Loser)", value="11-0", placeholder="e.g. 11-7")
+            
             if st.button("EXECUTE LOG", use_container_width=True):
-                club.update_match(w_name, l_name, 11, 0) 
-                st.success(f"MATCH ARCHIVED: {w_name} DEFEATED {l_name}")
-                st.rerun()
+                try:
+                    # 1. Parse the score string (e.g., "11-7" becomes [11, 7])
+                    pts = [int(x.strip()) for x in score_raw.split('-')]
+                    
+                    if len(pts) != 2:
+                        st.error("Format error: Use 'WinnerScore-LoserScore' (e.g. 11-5)")
+                    elif pts[0] <= pts[1]:
+                        st.error("Logic error: Winner's score must be higher than Loser's.")
+                    else:
+                        # 2. Update the Glicko Ratings with actual scores
+                        club.update_match(w_name, l_name, pts[0], pts[1])
+                        
+                        # 3. Log to History sheet so it shows up in Player Intel / Standings
+                        new_h_row = pd.DataFrame([{
+                            "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                            "Winner": w_name,
+                            "Loser": l_name,
+                            "Score": score_raw,
+                            "Match_Type": "Ranked"
+                        }])
+                        updated_h = pd.concat([h_df, new_h_row], ignore_index=True)
+                        conn.update(worksheet="history", data=updated_h)
+                        
+                        st.success(f"✅ MATCH ARCHIVED: {w_name} {score_raw} {l_name}")
+                        st.balloons()
+                        st.rerun()
+                        
+                except ValueError:
+                    st.error("Invalid numbers. Please use digits only (e.g., 11-8).")
     else:
         st.warning("Admin Key required to log match results.")
 elif menu == "PLAYER INTEL":
@@ -498,6 +532,9 @@ elif menu == "HALL OF FAME":
 
         st.markdown("---")
         st.dataframe(season_data, use_container_width=True, hide_index=True)
+        
+        
+
 
 st.markdown('<div class="floating-legend">', unsafe_allow_html=True)
 with st.popover("📜 STATUS KEY"):
