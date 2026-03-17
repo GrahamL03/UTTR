@@ -28,7 +28,7 @@ def archive_and_reset_season(season_name):
     # 4. Reset Players for New Season
     # We keep the names but reset stats to baseline
     reset_players = players_df.copy()
-    reset_players['Rating'] = 650
+    reset_players['Rating'] = 750
     reset_players['RD'] = 350
     reset_players['Volatility'] = 0.06
     reset_players['Wins'] = 0
@@ -459,12 +459,10 @@ elif menu == "PLAYER INTEL":
         if not h_df.empty:
             personal_history = h_df[(h_df['Winner'] == name) | (h_df['Loser'] == name)].copy()
             
-            # Start everyone at 1500
-            current_rating = 650
+            current_rating = 750
             ratings_over_time = []
             
             for _, row in personal_history.iterrows():
-                # This is a 'Lite' version of the history
                 # It adds 25 for a win and subtracts 20 for a loss just for the visual
                 if row['Winner'] == name:
                     current_rating += 25
