@@ -28,7 +28,7 @@ def archive_and_reset_season(season_name):
     # 4. Reset Players for New Season
     # We keep the names but reset stats to baseline
     reset_players = players_df.copy()
-    reset_players['Rating'] = 1500
+    reset_players['Rating'] = 650
     reset_players['RD'] = 350
     reset_players['Volatility'] = 0.06
     reset_players['Wins'] = 0
@@ -231,9 +231,9 @@ elif menu == "STANDINGS":
         
         # --- NEW: TIER EMOJI LOGIC ---
         tier_emoji = "🥉" # Bronze
-        if rating_val >= 1800: tier_emoji = "💎" # Diamond
-        elif rating_val >= 1700: tier_emoji = "🥇" # Gold
-        elif rating_val >= 1600: tier_emoji = "🥈" # Silver
+        if rating_val >= 2000: tier_emoji = "💎" # Diamond
+        elif rating_val >= 1400: tier_emoji = "🥇" # Gold
+        elif rating_val >= 1000: tier_emoji = "🥈" # Silver
         
         if not h_df.empty:
             p_matches = h_df[(h_df['Winner'] == name) | (h_df['Loser'] == name)]
@@ -292,7 +292,7 @@ elif menu == "STANDINGS":
         hide_index=True,
         column_config={
             "RATING": st.column_config.ProgressColumn(
-                "RATING", min_value=1000, max_value=2500, format="%d"
+                "RATING", min_value=0, max_value=3000, format="%d"
             )
         }
     )
@@ -460,7 +460,7 @@ elif menu == "PLAYER INTEL":
             personal_history = h_df[(h_df['Winner'] == name) | (h_df['Loser'] == name)].copy()
             
             # Start everyone at 1500
-            current_rating = 1500
+            current_rating = 650
             ratings_over_time = []
             
             for _, row in personal_history.iterrows():

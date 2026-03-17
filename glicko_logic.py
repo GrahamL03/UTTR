@@ -33,7 +33,7 @@ class ClubManager:
         """Sets up starting players if the sheet is found empty."""
         names = ["Graham Long", "Cooper Juchno", "Oliver Strickfaden", "Vincent Spoljarick"]
         for name in names:
-            self.players[name] = glicko2.Player()
+            self.players[name] = glicko2.Player(rating=650)
         self.save_to_cloud()
 
     def check_or_add_player(self, name):
