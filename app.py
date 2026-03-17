@@ -229,7 +229,6 @@ elif menu == "STANDINGS":
         form_str = ""
         rating_val = int(p.rating)
         
-        # --- NEW: TIER EMOJI LOGIC ---
         tier_emoji = "🥉" # Bronze
         if rating_val >= 2000: tier_emoji = "💎" # Diamond
         elif rating_val >= 1400: tier_emoji = "🥇" # Gold
@@ -264,7 +263,7 @@ elif menu == "STANDINGS":
             
             # --- BADGE LOGIC ---
             if i == 0: badges.append("🥇 CHAMP")
-            if dominance_count >= 3: badges.append("😤 DOMINANT") # THE NEW BADGE
+            if dominance_count >= 3: badges.append("😤 DOMINANT")
             if streak >= 3: badges.append("🔥 ON FIRE")
             if streak >= 5: badges.append("👑 UNSTOPPABLE")
             if l_streak >= 3: badges.append("🧊 COLD")
@@ -297,7 +296,7 @@ elif menu == "STANDINGS":
         }
     )
 
-    # --- NEW: CLUSTERED RATING DISTRIBUTION ---
+    # --- CLUSTERED RATING DISTRIBUTION ---
     st.markdown("---")
     st.caption("LEAGUE RATING DISTRIBUTION (250pt TIERS)")
     

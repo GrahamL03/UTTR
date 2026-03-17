@@ -39,13 +39,13 @@ class ClubManager:
     def check_or_add_player(self, name):
         """Internal check to ensure a player exists in the local dictionary."""
         if name not in self.players:
-            self.players[name] = glicko2.Player()
+            self.players[name] = glicko2.Player(rating=750)
 
     def add_new_player(self, name):
         """Registers a new player and immediately pushes to Google Sheets."""
         name = name.strip()
         if name and name not in self.players:
-            self.players[name] = glicko2.Player()
+            self.players[name] = glicko2.Player(rating=750)
             self.save_to_cloud() 
             return True
         return False
