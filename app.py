@@ -273,7 +273,7 @@ elif menu == "STANDINGS":
             if len(p_matches) < 5: badges.append("🐣 ROOKIE")
             if not last_5.empty and last_5.iloc[-1]['Winner'] == name and last_5.iloc[-1]['Loser'] in top_3 and name not in top_3:
                 badges.append("🔨 SLAYER")
-            if p.rd > 120: badges.append("❓ UNKNOWN")
+            if p.rd > 200: badges.append("❓ UNKNOWN")
             if "W W W W W" in form_str: badges.append("⚡ RAID")
 
         players_data.append({

@@ -67,7 +67,7 @@ The platform utilizes a dynamic badge system to signify performance milestones a
 | 🐣 ROOKIE | Logged fewer than 5 competitive matches. |
 | 🧊 COLD | Sustained 3 or more consecutive match losses. |
 | ⚡ RAID | Maintained a perfect 5-0 record over the most recent 5 matches. |
-| ❓ UNKNOWN | RD exceeds 120, requiring more data for an accurate assessment. |
+| ❓ UNKNOWN | RD exceeds 200, requiring more data for an accurate assessment. |
 
 ---
 
