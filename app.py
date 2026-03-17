@@ -202,7 +202,7 @@ if menu == "ADMIN SETTINGS":
         with st.container(border=True):
             st.subheader("🏁 Season Transition")
             st.write(f"Current Phase: **{get_current_season()}**")
-            st.warning("Ending the season will archive current ratings and reset everyone to 1500.")
+            st.warning("Ending the season will archive current ratings and reset everyone to 750.")
             
             season_input = st.text_input("NEW SEASON NAME", placeholder="e.g. Spring 2026")
             confirm_check = st.checkbox("I confirm I want to wipe the current leaderboard.")
