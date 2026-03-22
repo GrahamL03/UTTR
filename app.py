@@ -30,7 +30,7 @@ def archive_and_reset_season(season_name):
     reset_players = players_df.copy()
     reset_players['Rating'] = 750
     reset_players['RD'] = 350
-    reset_players['Volatility'] = 0.06
+    reset_players['Sigma'] = 0.06
     reset_players['Wins'] = 0
     reset_players['Losses'] = 0
     
@@ -149,7 +149,7 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 # --- 4. LOGGING UTILITY (Must be defined globally) ---
-def log_tournament_match(p1, p2, round_name, winner, status="Completed"):
+def log_tournament_match(p1, p2, round_name, winner, score_str="11-0", status="Completed"):
     global h_df, t_df
     # 1. Log to tournament_matches sheet
     new_t_row = pd.DataFrame([{
@@ -164,7 +164,7 @@ def log_tournament_match(p1, p2, round_name, winner, status="Completed"):
         "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "Winner": winner, 
         "Loser": p2 if winner == p1 else p1,
-        "Score": "11-0", 
+        "Score": score_str,  # Use the passed string
         "Match_Type": "Tournament"
     }])
     updated_h = pd.concat([h_df, new_h_row], ignore_index=True)
@@ -327,7 +327,12 @@ elif menu == "TOURNAMENT":
             if len(selected) == 8 and st.button("GENERATE SEEDED BRACKET", use_container_width=True):
                 seeded = sorted(selected, key=lambda x: club.players[x].rating, reverse=True)
                 pairings = [(seeded[0], seeded[7]), (seeded[3], seeded[4]), (seeded[1], seeded[6]), (seeded[2], seeded[5])]
-                st.session_state.bracket = {"id": t_id, "QF": [{"p1": p1, "p2": p2, "w": None} for p1, p2 in pairings], "SF": [{"p1": "TBD", "p2": "TBD", "w": None}, {"p1": "TBD", "p2": "TBD", "w": None}], "F": {"p1": "TBD", "p2": "TBD", "w": None}}
+                st.session_state.bracket = {
+                    "id": t_id, 
+                    "QF": [{"p1": p1, "p2": p2, "w": None} for p1, p2 in pairings], 
+                    "SF": [{"p1": "TBD", "p2": "TBD", "w": None}, {"p1": "TBD", "p2": "TBD", "w": None}], 
+                    "F": {"p1": "TBD", "p2": "TBD", "w": None}
+                }
                 st.rerun()
         else:
             st.warning("No active tournament. Admin key required to start one.")
@@ -337,7 +342,8 @@ elif menu == "TOURNAMENT":
             st.rerun()
 
         col1, col2, col3 = st.columns(3)
-        # Quarterfinals
+        
+        # --- Quarterfinals ---
         with col1:
             st.caption("QUARTERFINALS")
             for i, m in enumerate(st.session_state.bracket["QF"]):
@@ -345,18 +351,22 @@ elif menu == "TOURNAMENT":
                     st.write(f"**{m['p1']}** vs **{m['p2']}**")
                     if m["w"] is None:
                         if is_admin:
+                            t_score = st.text_input("Score", value="11-5 | 11-5", key=f"score_qf_{i}", help="Winner-Loser per game, separated by |")
                             win = st.selectbox("Winner", [m['p1'], m['p2']], key=f"qf_{i}")
                             if st.button(f"Confirm QF{i+1}"):
-                                log_tournament_match(m['p1'], m['p2'], "QF", win)
-                                club.update_match(win, (m['p2'] if win == m['p1'] else m['p1']), 11, 0)
-                                st.session_state.bracket["QF"][i]["w"] = win
-                                sf_idx, slot = i // 2, ("p1" if i % 2 == 0 else "p2")
-                                st.session_state.bracket["SF"][sf_idx][slot] = win
-                                st.rerun()
+                                try:
+                                    parsed = [[int(x.strip()) for x in s.split('-')] for s in t_score.split('|')]
+                                    log_tournament_match(m['p1'], m['p2'], "QF", win, score_str=t_score)
+                                    club.update_match(win, (m['p2'] if win == m['p1'] else m['p1']), parsed, match_type="Best of 3")
+                                    st.session_state.bracket["QF"][i]["w"] = win
+                                    sf_idx, slot = i // 2, ("p1" if i % 2 == 0 else "p2")
+                                    st.session_state.bracket["SF"][sf_idx][slot] = win
+                                    st.rerun()
+                                except: st.error("Format Error. Use '11-5 | 11-5'")
                         else: st.info("Match in progress...")
                     else: st.success(f"🏆 {m['w']}")
         
-        # Semifinals
+        # --- Semifinals ---
         with col2:
             st.caption("SEMIFINALS")
             for i, m in enumerate(st.session_state.bracket["SF"]):
@@ -364,17 +374,21 @@ elif menu == "TOURNAMENT":
                     st.write(f"**{m['p1']}** vs **{m['p2']}**")
                     if m["w"] is None and "TBD" not in [m['p1'], m['p2']]:
                         if is_admin:
+                            t_score = st.text_input("Score", value="11-5 | 11-5", key=f"score_sf_{i}")
                             win = st.selectbox("Winner", [m['p1'], m['p2']], key=f"sf_{i}")
                             if st.button(f"Confirm SF{i+1}"):
-                                log_tournament_match(m['p1'], m['p2'], "SF", win)
-                                club.update_match(win, (m['p2'] if win == m['p1'] else m['p1']), 11, 0)
-                                st.session_state.bracket["SF"][i]["w"] = win
-                                st.session_state.bracket["F"]["p1" if i == 0 else "p2"] = win
-                                st.rerun()
+                                try:
+                                    parsed = [[int(x.strip()) for x in s.split('-')] for s in t_score.split('|')]
+                                    log_tournament_match(m['p1'], m['p2'], "SF", win, score_str=t_score)
+                                    club.update_match(win, (m['p2'] if win == m['p1'] else m['p1']), parsed, match_type="Best of 3")
+                                    st.session_state.bracket["SF"][i]["w"] = win
+                                    st.session_state.bracket["F"]["p1" if i == 0 else "p2"] = win
+                                    st.rerun()
+                                except: st.error("Format Error.")
                         else: st.info("Match in progress...")
                     elif m["w"]: st.success(f"🏆 {m['w']}")
 
-        # Finals
+        # --- Finals ---
         with col3:
             st.caption("FINALS")
             m = st.session_state.bracket["F"]
@@ -382,12 +396,16 @@ elif menu == "TOURNAMENT":
                 st.write(f"**{m['p1']}** vs **{m['p2']}**")
                 if m["w"] is None and "TBD" not in [m['p1'], m['p2']]:
                     if is_admin:
+                        t_score = st.text_input("Score", value="11-5 | 11-5", key="score_f")
                         win = st.selectbox("Winner", [m['p1'], m['p2']], key="f_win")
                         if st.button("Confirm Champion"):
-                            log_tournament_match(m['p1'], m['p2'], "Final", win, "Champion Crowned")
-                            club.update_match(win, (m['p2'] if win == m['p1'] else m['p1']), 11, 0)
-                            st.session_state.bracket["F"]["w"] = win
-                            st.balloons(); st.rerun()
+                            try:
+                                parsed = [[int(x.strip()) for x in s.split('-')] for s in t_score.split('|')]
+                                log_tournament_match(m['p1'], m['p2'], "Final", win, score_str=t_score)
+                                club.update_match(win, (m['p2'] if win == m['p1'] else m['p1']), parsed, match_type="Best of 3")
+                                st.session_state.bracket["F"]["w"] = win
+                                st.balloons(); st.rerun()
+                            except: st.error("Format Error.")
                     else: st.info("Match in progress...")
                 elif m["w"]: st.success(f"👑 {m['w']}")
 
@@ -395,47 +413,63 @@ elif menu == "TOURNAMENT":
     st.markdown("#### 📜 SYSTEM ARCHIVE: TOURNAMENT MATCHES")
     st.dataframe(t_df.sort_index(ascending=False), use_container_width=True, hide_index=True)
 elif menu == "LOG MATCH":
-    st.markdown("#### RECORD RECENT DATA")
+    st.markdown("#### 📝 RECORD RECENT DATA")
     if is_admin:
         with st.container(border=True):
-            w_name = st.selectbox("WINNER", sorted(list(club.players.keys())))
-            l_name = st.selectbox("LOSER", sorted([p for p in club.players.keys() if p != w_name]))
-            
-            # Help the admin with a format reminder
-            score_raw = st.text_input("SCORE (Winner-Loser)", value="11-0", placeholder="e.g. 11-7")
-            
-            if st.button("EXECUTE LOG", use_container_width=True):
+            m_type = st.radio("MATCH FORMAT", ["Single", "Best of 3"], horizontal=True)
+
+            col1, col2 = st.columns(2)
+            with col1:
+                w_name = st.selectbox("WINNER", sorted(list(club.players.keys())))
+            with col2:
+                l_name = st.selectbox("LOSER", sorted([p for p in club.players.keys() if p != w_name]))
+
+            scores = []
+            if m_type == "Best of 3":
+                st.caption("Enter scores for each game (Winner-Loser)")
+                c1, c2, c3 = st.columns(3)
+                with c1: g1 = st.text_input("Game 1", value="11-5")
+                with c2: g2 = st.text_input("Game 2", value="11-5")
+                with c3: g3 = st.text_input("Game 3 (Optional)", value="", help="Leave blank if 2-0")
+                
+                # Filter out empty inputs
+                scores = [g1, g2]
+                if g3.strip(): scores.append(g3)
+            else:
+                score_single = st.text_input("SCORE", value="11-5")
+                scores = [score_single]
+
+            if st.button("🚀 EXECUTE LOG", use_container_width=True):
                 try:
-                    # 1. Parse the score string (e.g., "11-7" becomes [11, 7])
-                    pts = [int(x.strip()) for x in score_raw.split('-')]
+                    # Validate and parse all scores
+                    parsed_scores = []
+                    for s in scores:
+                        pts = [int(x.strip()) for x in s.split('-')]
+                        if len(pts) == 2:
+                            parsed_scores.append(pts)
                     
-                    if len(pts) != 2:
-                        st.error("Format error: Use 'WinnerScore-LoserScore' (e.g. 11-5)")
-                    elif pts[0] <= pts[1]:
-                        st.error("Logic error: Winner's score must be higher than Loser's.")
-                    else:
-                        # 2. Update the Glicko Ratings with actual scores
-                        club.update_match(w_name, l_name, pts[0], pts[1])
-                        
-                        # 3. Log to History sheet so it shows up in Player Intel / Standings
-                        new_h_row = pd.DataFrame([{
-                            "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            "Winner": w_name,
-                            "Loser": l_name,
-                            "Score": score_raw,
-                            "Match_Type": "Ranked"
-                        }])
-                        updated_h = pd.concat([h_df, new_h_row], ignore_index=True)
-                        conn.update(worksheet="history", data=updated_h)
-                        
-                        st.success(f"✅ MATCH ARCHIVED: {w_name} {score_raw} {l_name}")
-                        st.balloons()
-                        st.rerun()
-                        
-                except ValueError:
-                    st.error("Invalid numbers. Please use digits only (e.g., 11-8).")
+                    # Update Logic
+                    club.update_match(w_name, l_name, parsed_scores, match_type=m_type)
+                    
+                    # History Log String
+                    history_score = " | ".join(scores)
+                    new_h_row = pd.DataFrame([{
+                        "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "Winner": w_name,
+                        "Loser": l_name,
+                        "Score": history_score,
+                        "Match_Type": m_type
+                    }])
+                    
+                    updated_h = pd.concat([h_df, new_h_row], ignore_index=True)
+                    conn.update(worksheet="history", data=updated_h)
+                    
+                    st.success("✅ MATCH ARCHIVED")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error: {e}")
     else:
-        st.warning("Admin Key required to log match results.")
+        st.warning("🔒 Admin Key required to log match results.")
 elif menu == "PLAYER INTEL":
     st.markdown("#### SUBJECT DOSSIER")
     name = st.selectbox("IDENTIFY", sorted(list(club.players.keys())))
@@ -471,6 +505,7 @@ elif menu == "PLAYER INTEL":
             
             personal_history['Rating_History'] = ratings_over_time
             st.line_chart(personal_history.set_index('Date')['Rating_History'])
+            
 
 elif menu == "VERSUS":
     st.markdown("#### MATCHUP ANALYSIS")
