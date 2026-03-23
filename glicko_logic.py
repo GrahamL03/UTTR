@@ -120,28 +120,26 @@ class ClubManager:
             "F": {"p1": "TBD", "p2": "TBD", "w": None}
         }
     def rebuild_ratings(self, history_df):
-        """
-        Wipes current ratings and replays the entire history 
-        provided in the dataframe to get 'true' current ratings.
-        """
-        # Reset everyone to baseline
+        import glicko2
+        # 1. Reset everyone to baseline
         for name in self.players:
-            self.players[name] = glicko2.Player(rating=750)
-            
-        # Sort history by date so we process matches in order
+            self.players[name].rating = 750
+            self.players[name].rd = 350
+            self.players[name].vol = 0.06
+
+        # 2. Sort history by date to ensure chronological order
         history_df = history_df.sort_values('Date')
 
+        # 3. Replay every match
         for _, row in history_df.iterrows():
-            # We use the existing logic you already have
-            # but we pass the scores stored in the sheet
-            try:
-                # Convert "11-5 | 11-7" string back to [[11, 5], [11, 7]]
-                parsed = [[int(x.strip()) for x in s.split('-')] for s in row['Score'].split('|')]
-                
-                # Internal update (no saving to cloud inside the loop to save speed)
-                self.update_match_silently(row['Winner'], row['Loser'], parsed, row['Match_Type'])
-            except:
-                continue # Skip malformed rows
-        
-        # Finally, save the new "Corrected" ratings to the cloud
-        self.save_to_cloud()
+            w_name = row['Winner']
+            l_name = row['Loser']
+            
+            # Ensure players exist in the current session
+            if w_name in self.players and l_name in self.players:
+                # We treat every match in history as a "Single" 
+                # unless you want to get complex with scores here
+                self.update_match(w_name, l_name, [[11, 5]], match_type="Single")
+
+        # 4. Push the final recalculated numbers back to Google Sheets
+        self.save_to_sheets()
