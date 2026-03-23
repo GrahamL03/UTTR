@@ -121,14 +121,15 @@ class ClubManager:
         }
         
     def save_to_sheets(self):
-        from streamlit_gsheets import GSheetsConnection
+        # We must import these inside the function to avoid circular imports
         import streamlit as st
+        from streamlit_gsheets import GSheetsConnection
         import pandas as pd
 
-        # 1. Establish connection
+        # 1. RE-ESTABLISH THE CONNECTION LOCALLY
         conn = st.connection("gsheets", type=GSheetsConnection)
 
-        # 2. Prepare the data from the internal players dictionary
+        # 2. PREPARE DATA
         data = []
         for name, p in self.players.items():
             data.append({
@@ -140,10 +141,9 @@ class ClubManager:
                 "Losses": p.losses
             })
         
-        # 3. Convert to DataFrame and push to the "players" worksheet
+        # 3. PUSH TO CLOUD
         df = pd.DataFrame(data)
         conn.update(worksheet="players", data=df)
-    
     
     def rebuild_ratings(self, history_df):
         import glicko2
@@ -152,6 +152,8 @@ class ClubManager:
             self.players[name].rating = 750
             self.players[name].rd = 350
             self.players[name].vol = 0.06
+            self.players[name].wins = 0    # Reset these!
+            self.players[name].losses = 0  # Reset these!
 
         # 2. Sort history by date to ensure chronological order
         history_df = history_df.sort_values('Date')
