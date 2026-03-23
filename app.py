@@ -439,35 +439,42 @@ elif menu == "LOG MATCH":
                 score_single = st.text_input("SCORE", value="11-5")
                 scores = [score_single]
 
-            if st.button("🚀 EXECUTE LOG", use_container_width=True):
-                try:
-                    # Validate and parse all scores
-                    parsed_scores = []
-                    for s in scores:
-                        pts = [int(x.strip()) for x in s.split('-')]
-                        if len(pts) == 2:
-                            parsed_scores.append(pts)
-                    
-                    # Update Logic
-                    club.update_match(w_name, l_name, parsed_scores, match_type=m_type)
-                    
-                    # History Log String
-                    history_score = " | ".join(scores)
-                    new_h_row = pd.DataFrame([{
-                        "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                        "Winner": w_name,
-                        "Loser": l_name,
-                        "Score": history_score,
-                        "Match_Type": m_type
-                    }])
-                    
-                    updated_h = pd.concat([h_df, new_h_row], ignore_index=True)
-                    conn.update(worksheet="history", data=updated_h)
-                    
-                    st.success("✅ MATCH ARCHIVED")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error: {e}")
+            # ... inside the LOG MATCH block ...
+if st.button("🚀 EXECUTE LOG", use_container_width=True):
+    try:
+        parsed_scores = []
+        for s in scores:
+            if "-" in s:
+                # This splits "11-5" into [11, 5]
+                pts = [int(x.strip()) for x in s.split('-')]
+                if len(pts) == 2:
+                    parsed_scores.append(pts)
+        
+        if not parsed_scores:
+            st.error("Invalid Score Format. Use '11-5'")
+            st.stop()
+
+        # Update the Glicko Ratings
+        club.update_match(w_name, l_name, parsed_scores, match_type=m_type)
+        
+        # Log to History Sheet
+        history_score = " | ".join(scores)
+        new_h_row = pd.DataFrame([{
+            "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "Winner": w_name,
+            "Loser": l_name,
+            "Score": history_score,
+            "Match_Type": m_type
+        }])
+        
+        updated_h = pd.concat([h_df, new_h_row], ignore_index=True)
+        conn.update(worksheet="history", data=updated_h)
+        
+        st.success(f"✅ MATCH ARCHIVED: {w_name} def. {l_name} ({history_score})")
+        st.balloons()
+        st.rerun()
+    except Exception as e:
+        st.error(f"LOGGING ERROR: {e}")
     else:
         st.warning("🔒 Admin Key required to log match results.")
 elif menu == "PLAYER INTEL":
