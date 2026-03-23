@@ -373,7 +373,7 @@ elif menu == "TOURNAMENT":
                                 try:
                                     parsed = [[int(x.strip()) for x in s.split('-')] for s in t_score.split('|')]
                                     log_tournament_match(m['p1'], m['p2'], "QF", win, score_str=t_score)
-                                    club.update_match(win, (m['p2'] if win == m['p1'] else m['p1']), parsed, match_type="Best of 3")
+                                    club.update_match(win, (m['p2'] if win == m['p1'] else m['p1']), parsed)
                                     st.session_state.bracket["QF"][i]["w"] = win
                                     sf_idx, slot = i // 2, ("p1" if i % 2 == 0 else "p2")
                                     st.session_state.bracket["SF"][sf_idx][slot] = win
@@ -396,7 +396,7 @@ elif menu == "TOURNAMENT":
                                 try:
                                     parsed = [[int(x.strip()) for x in s.split('-')] for s in t_score.split('|')]
                                     log_tournament_match(m['p1'], m['p2'], "SF", win, score_str=t_score)
-                                    club.update_match(win, (m['p2'] if win == m['p1'] else m['p1']), parsed, match_type="Best of 3")
+                                    club.update_match(win, (m['p2'] if win == m['p1'] else m['p1']), parsed)
                                     st.session_state.bracket["SF"][i]["w"] = win
                                     st.session_state.bracket["F"]["p1" if i == 0 else "p2"] = win
                                     st.rerun()
@@ -418,7 +418,7 @@ elif menu == "TOURNAMENT":
                             try:
                                 parsed = [[int(x.strip()) for x in s.split('-')] for s in t_score.split('|')]
                                 log_tournament_match(m['p1'], m['p2'], "Final", win, score_str=t_score)
-                                club.update_match(win, (m['p2'] if win == m['p1'] else m['p1']), parsed, match_type="Best of 3")
+                                club.update_match(win, (m['p2'] if win == m['p1'] else m['p1']), parsed)
                                 st.session_state.bracket["F"]["w"] = win
                                 st.balloons(); st.rerun()
                             except: st.error("Format Error.")
@@ -468,8 +468,7 @@ elif menu == "LOG MATCH":
                         st.error("Invalid Score Format. Use '11-5'")
                     else:
                         # 1. Update the Glicko Ratings via the ClubManager
-                        club.update_match(w_name, l_name, parsed_scores, match_type=m_type)
-                        
+                        club.update_match(w_name, l_name, parsed_scores)                        
                         # 2. Log to History Sheet
                         history_score = " | ".join(scores)
                         new_h_row = pd.DataFrame([{
