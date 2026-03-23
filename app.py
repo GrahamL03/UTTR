@@ -273,7 +273,6 @@ elif menu == "STANDINGS":
             if not last_5.empty and last_5.iloc[-1]['Winner'] == name and last_5.iloc[-1]['Loser'] in top_3 and name not in top_3:
                 badges.append("🔨 SLAYER")
             if p.rd > 200: badges.append("❓ UNKNOWN")
-            if "W W W W W" in form_str: badges.append("⚡ RAID")
 
         players_data.append({
             "RK": i + 1,
@@ -600,6 +599,5 @@ with st.popover("📜 STATUS KEY"):
     | 🐣 **ROOKIE** | < 5 Matches | Initial calibration phase; low data confidence. |
     | 🔨 **SLAYER** | Giant Killer | Recently defeated a Top 3 ranked player. |
     | ❓ **UNKNOWN** | RD > 200 | Inactive or new; rating is highly speculative. |
-    | ⚡ **RAID** | 5/5 Wins | Perfect form in the last 5 recorded matches. |
     """)
 st.markdown('</div>', unsafe_allow_html=True)
