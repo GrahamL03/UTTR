@@ -223,6 +223,9 @@ elif menu == "STANDINGS":
     sorted_players = sorted(club.players.items(), key=lambda x: x[1].rating, reverse=True)
     top_3 = [x[0] for x in sorted_players[:3]]
     players_data = []
+    
+    # We use a separate counter to keep ranks sequential (1, 2, 3...)
+    rank_counter = 1 
 
     for i, (name, p) in enumerate(sorted_players):
         badges = []
@@ -236,6 +239,11 @@ elif menu == "STANDINGS":
         
         if not h_df.empty:
             p_matches = h_df[(h_df['Winner'] == name) | (h_df['Loser'] == name)]
+            
+            # --- FILTER: Skip players with 0 matches ---
+            if p_matches.empty:
+                continue 
+            
             last_5 = p_matches.tail(5)
             streak, l_streak = 0, 0
             
@@ -262,7 +270,7 @@ elif menu == "STANDINGS":
                     form_str += "L "; l_streak += 1; streak = 0
             
             # --- BADGE LOGIC ---
-            if i == 0: badges.append("🥇 CHAMP")
+            if rank_counter == 1: badges.append("🥇 CHAMP")
             if dominance_count >= 3: badges.append("😤 DOMINANT")
             if streak >= 3: badges.append("🔥 ON FIRE")
             if streak >= 5: badges.append("👑 UNSTOPPABLE")
@@ -273,39 +281,48 @@ elif menu == "STANDINGS":
             if not last_5.empty and last_5.iloc[-1]['Winner'] == name and last_5.iloc[-1]['Loser'] in top_3 and name not in top_3:
                 badges.append("🔨 SLAYER")
             if p.rd > 200: badges.append("❓ UNKNOWN")
+        else:
+            # If the entire history database is empty, skip everyone
+            continue
 
         players_data.append({
-            "RK": i + 1,
+            "RK": rank_counter,
             "PLAYER": f"{tier_emoji} {name.upper()}",
             "RATING": rating_val,
             "STATUS": " ".join(badges) if badges else "---",
             "FORM": form_str.strip() if form_str else "---",
             "STABILITY": f"{int(100 - (p.rd/3.5))}%"
         })
+        
+        # Increment the rank counter only when a player is actually added
+        rank_counter += 1
 
     # --- RENDER TABLE ---
-    st.dataframe(
-        pd.DataFrame(players_data), 
-        use_container_width=True, 
-        hide_index=True,
-        column_config={
-            "RATING": st.column_config.ProgressColumn(
-                "RATING", min_value=0, max_value=3000, format="%d"
-            )
-        }
-    )
+    if players_data:
+        st.dataframe(
+            pd.DataFrame(players_data), 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={
+                "RATING": st.column_config.ProgressColumn(
+                    "RATING", min_value=0, max_value=3000, format="%d"
+                )
+            }
+        )
+    else:
+        st.info("No matches have been played yet. Record a match to generate the standings!")
 
     # --- CLUSTERED RATING DISTRIBUTION ---
     st.markdown("---")
     st.caption("LEAGUE RATING DISTRIBUTION (250pt TIERS)")
     
-    all_ratings = [int(p.rating) for p in club.players.values()]
+    # Update this to only chart players who are actively displayed on the board
+    all_ratings = [row['RATING'] for row in players_data]
     
     if all_ratings:
         df_dist = pd.DataFrame(all_ratings, columns=['Rating'])
         
         # Cluster into 250-point buckets
-        # (Rating // 250) * 250 finds the floor of the 250-block
         df_dist['Tier'] = (df_dist['Rating'] // 250) * 250
         
         # Create the label (e.g., 1000-1249)
