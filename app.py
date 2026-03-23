@@ -367,18 +367,25 @@ elif menu == "TOURNAMENT":
                     st.write(f"**{m['p1']}** vs **{m['p2']}**")
                     if m["w"] is None:
                         if is_admin:
-                            t_score = st.text_input("Score", value="11-5 | 11-5", key=f"score_qf_{i}", help="Winner-Loser per game, separated by |")
+                            t_score = st.text_input("Score", value="11-5 | 11-5", key=f"score_qf_{i}")
                             win = st.selectbox("Winner", [m['p1'], m['p2']], key=f"qf_{i}")
                             if st.button(f"Confirm QF{i+1}"):
                                 try:
+                                    # Parse: "11-5 | 11-7" -> [[11, 5], [11, 7]]
                                     parsed = [[int(x.strip()) for x in s.split('-')] for s in t_score.split('|')]
-                                    log_tournament_match(m['p1'], m['p2'], "QF", win, score_str=t_score)
-                                    club.update_match(win, (m['p2'] if win == m['p1'] else m['p1']), parsed)
-                                    st.session_state.bracket["QF"][i]["w"] = win
+                                    loser = m['p2'] if win == m['p1'] else m['p1']
+                                    
+                                    # Update Glicko (Single call)
+                                    club.update_match(win, loser, parsed, match_type="Best of 3")
+                                    log_tournament_match(win, loser, "QF", win, score_str=t_score)
+                                    
+                                    # Advance bracket
                                     sf_idx, slot = i // 2, ("p1" if i % 2 == 0 else "p2")
                                     st.session_state.bracket["SF"][sf_idx][slot] = win
+                                    st.session_state.bracket["QF"][i]["w"] = win
                                     st.rerun()
-                                except: st.error("Format Error. Use '11-5 | 11-5'")
+                                except Exception as e: 
+                                    st.error(f"Format Error: Use '11-5 | 11-5'")
                         else: st.info("Match in progress...")
                     else: st.success(f"🏆 {m['w']}")
         
@@ -395,12 +402,16 @@ elif menu == "TOURNAMENT":
                             if st.button(f"Confirm SF{i+1}"):
                                 try:
                                     parsed = [[int(x.strip()) for x in s.split('-')] for s in t_score.split('|')]
-                                    log_tournament_match(m['p1'], m['p2'], "SF", win, score_str=t_score)
-                                    club.update_match(win, (m['p2'] if win == m['p1'] else m['p1']), parsed)
+                                    loser = m['p2'] if win == m['p1'] else m['p1']
+                                    
+                                    club.update_match(win, loser, parsed, match_type="Best of 3")
+                                    log_tournament_match(win, loser, "SF", win, score_str=t_score)
+                                    
                                     st.session_state.bracket["SF"][i]["w"] = win
                                     st.session_state.bracket["F"]["p1" if i == 0 else "p2"] = win
                                     st.rerun()
-                                except: st.error("Format Error.")
+                                except Exception as e: 
+                                    st.error(f"Format Error")
                         else: st.info("Match in progress...")
                     elif m["w"]: st.success(f"🏆 {m['w']}")
 
@@ -417,11 +428,16 @@ elif menu == "TOURNAMENT":
                         if st.button("Confirm Champion"):
                             try:
                                 parsed = [[int(x.strip()) for x in s.split('-')] for s in t_score.split('|')]
-                                log_tournament_match(m['p1'], m['p2'], "Final", win, score_str=t_score)
-                                club.update_match(win, (m['p2'] if win == m['p1'] else m['p1']), parsed)
+                                loser = m['p2'] if win == m['p1'] else m['p1']
+                                
+                                club.update_match(win, loser, parsed, match_type="Best of 3")
+                                log_tournament_match(win, loser, "Final", win, score_str=t_score)
+                                
                                 st.session_state.bracket["F"]["w"] = win
-                                st.balloons(); st.rerun()
-                            except: st.error("Format Error.")
+                                st.balloons()
+                                st.rerun()
+                            except Exception as e: 
+                                st.error(f"Format Error")
                     else: st.info("Match in progress...")
                 elif m["w"]: st.success(f"👑 {m['w']}")
 
@@ -454,41 +470,29 @@ elif menu == "LOG MATCH":
                 score_single = st.text_input("SCORE", value="11-5")
                 scores = [score_single]
 
-            # --- EXECUTION BUTTON ---
             if st.button("🚀 EXECUTE LOG", use_container_width=True):
                 try:
-                    parsed_scores = []
-                    for s in scores:
-                        if "-" in s:
-                            pts = [int(x.strip()) for x in s.split('-')]
-                            if len(pts) == 2:
-                                parsed_scores.append(pts)
+                    # 1. Parse into list of lists: [[11, 5], [11, 7]]
+                    parsed_scores = [[int(x.strip()) for x in s.split('-')] for s in scores]
                     
-                    if not parsed_scores:
-                        st.error("Invalid Score Format. Use '11-5'")
-                    else:
-                        # 1. Update the Glicko Ratings via the ClubManager
-                        club.update_match(w_name, l_name, parsed_scores)                        
-                        # 2. Log to History Sheet
-                        history_score = " | ".join(scores)
-                        new_h_row = pd.DataFrame([{
-                            "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            "Winner": w_name,
-                            "Loser": l_name,
-                            "Score": history_score,
-                            "Match_Type": m_type
-                        }])
-                        
-                        updated_h = pd.concat([h_df, new_h_row], ignore_index=True)
-                        conn.update(worksheet="history", data=updated_h)
-                        
-                        st.success(f"✅ MATCH ARCHIVED: {w_name} def. {l_name} ({history_score})")
-                        st.balloons()
-                        st.rerun()
+                    # 2. Update Glicko ONCE with the full set data
+                    club.update_match(w_name, l_name, parsed_scores, match_type=m_type)     
+                                       
+                    # 3. Log to History Sheet
+                    history_score = " | ".join(scores)
+                    new_h_row = pd.DataFrame([{
+                        "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "Winner": w_name, "Loser": l_name,
+                        "Score": history_score, "Match_Type": m_type
+                    }])
+                    
+                    conn.update(worksheet="history", data=pd.concat([h_df, new_h_row], ignore_index=True))
+                    
+                    st.success(f"✅ MATCH ARCHIVED: {history_score}")
+                    st.balloons()
+                    st.rerun()
                 except Exception as e:
-                    st.error(f"LOGGING ERROR: {e}")
-    else:
-        st.warning("🔒 Admin Key required to log match results.")
+                    st.error(f"LOGGING ERROR: {e}. Ensure scores use '-' (e.g., 11-5)")
 elif menu == "PLAYER INTEL":
     st.markdown("#### SUBJECT DOSSIER")
     name = st.selectbox("IDENTIFY", sorted(list(club.players.keys())))

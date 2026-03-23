@@ -48,32 +48,41 @@ class ClubManager:
             return True
         return False
 
-    def update_match(self, w_name, l_name, parsed_scores, match_type="Single"):
+    def update_match(self, w_name, l_name, scores, match_type="Single"):
+        """
+        Updates ratings. 
+        'scores' should be a list of lists, e.g., [[11, 5], [11, 7]]
+        """
         self.check_or_add_player(w_name)
         self.check_or_add_player(l_name)
 
         winner = self.players[w_name]
         loser = self.players[l_name]
         
-        # Snapshot old values before Glicko update
+        # 1. Standard Glicko-2 Update (The mathematical core)
+        # Snapshot old values
         w_old_r, l_old_r = winner.rating, loser.rating
         w_old_rd, l_old_rd = winner.rd, loser.rd
 
-        # 1. Standard Glicko-2 Step
+        # Update based on a Match Win (1) vs Match Loss (0)
         winner.update_player([l_old_r], [l_old_rd], [1])
         loser.update_player([w_old_r], [w_old_rd], [0])
 
-        # 2. Score-Based Multiplier
-        # Calculates the margin of victory (e.g., 11-5 = 6)
-        total_spread = sum(abs(game[0] - game[1]) for game in parsed_scores)
-        avg_spread = total_spread / len(parsed_scores)
+        # 2. Score-Based Multiplier Logic
+        # Ensure scores is a list of lists even if only one game was passed
+        if isinstance(scores[0], int):
+            scores = [scores]
+
+        total_spread = sum(abs(game[0] - game[1]) for game in scores)
+        avg_spread = total_spread / len(scores)
         
-        # Boost rating change if the win was dominant or a long series
+        # Boost rating change: more points for blowouts (avg_spread) 
+        # and more points for long-format matches (type_mult)
         spread_mult = 1 + (avg_spread / 22)
-        type_mult = 1.5 if match_type == "Best of 3" else 1.0
+        type_mult = 1.5 if match_type == "Best of 3" or len(scores) > 1 else 1.0
         final_multiplier = spread_mult * type_mult
 
-        # Applying the multiplier to the delta
+        # Apply multiplier to the DIFFERENCE between new and old rating
         winner.rating = w_old_r + ((winner.rating - w_old_r) * final_multiplier)
         loser.rating = l_old_r + ((loser.rating - l_old_r) * final_multiplier)
 
