@@ -152,8 +152,7 @@ class ClubManager:
             self.players[name].rating = 750
             self.players[name].rd = 350
             self.players[name].vol = 0.06
-            self.players[name].wins = 0    # Reset these!
-            self.players[name].losses = 0  # Reset these!
+
 
         # 2. Sort history by date to ensure chronological order
         history_df = history_df.sort_values('Date')
