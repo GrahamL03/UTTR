@@ -548,12 +548,31 @@ elif menu == "VERSUS":
     p2_n = st.selectbox("PLAYER B", sorted([x for x in club.players.keys() if x != p1_n]))
     
     p1, p2 = club.players[p1_n], club.players[p2_n]
-    prob = 1 / (1 + math.pow(10, ((p2.rating - p1.rating) / 400)))
     
-    # Visual Probability Bar
-    st.write(f"**{p1_n}** has a **{int(prob*100)}%** predicted chance to win.")
+    # --- ADJUSTED WIN PROBABILITY FORMULA ---
+    # We increase the scale from 400 to 800 to make it less volatile.
+    # A gap of 200 pts now looks like a ~64% chance instead of ~76%.
+    scale = 800 
+    prob = 1 / (1 + math.pow(10, ((p2.rating - p1.rating) / scale)))
+    
+    # Display probability with a clean progress bar
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.subheader(f"{int(prob*100)}%")
+        st.caption(f"CHANCE FOR {p1_n.upper()}")
+    with col_b:
+        st.subheader(f"{int((1-prob)*100)}%")
+        st.caption(f"CHANCE FOR {p2_n.upper()}")
+
     st.progress(prob)
     
+    # Add a "Tale of the Tape" comparison
+    with st.container(border=True):
+        t1, t2, t3 = st.columns([2, 1, 2])
+        t1.write(f"**{int(p1.rating)}** (±{int(p1.rd)})")
+        t2.write("vs")
+        t3.write(f"**{int(p2.rating)}** (±{int(p2.rd)})")
+
     # Head-to-Head Stats
     if not h_df.empty:
         h2h = h_df[((h_df['Winner'] == p1_n) & (h_df['Loser'] == p2_n)) | 
@@ -565,12 +584,14 @@ elif menu == "VERSUS":
         st.markdown("---")
         st.caption("HEAD-TO-HEAD HISTORY")
         
-        chart_data = pd.DataFrame({
-            "Player": [p1_n, p2_n],
-            "Wins": [p1_h2h_wins, p2_h2h_wins]
-        })
-        st.bar_chart(chart_data.set_index("Player"))
-        
+        if not h2h.empty:
+            chart_data = pd.DataFrame({
+                "Player": [p1_n, p2_n],
+                "Wins": [p1_h2h_wins, p2_h2h_wins]
+            })
+            st.bar_chart(chart_data.set_index("Player"))
+        else:
+            st.info("No previous match history between these two subjects.")
 elif menu == "HALL OF FAME":
     st.markdown("#### 🏛️ SEASON RECORDS")
     
