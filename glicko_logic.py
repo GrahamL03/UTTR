@@ -119,3 +119,29 @@ class ClubManager:
             "SF": [{"p1": "TBD", "p2": "TBD", "w": None}, {"p1": "TBD", "p2": "TBD", "w": None}],
             "F": {"p1": "TBD", "p2": "TBD", "w": None}
         }
+    def rebuild_ratings(self, history_df):
+        """
+        Wipes current ratings and replays the entire history 
+        provided in the dataframe to get 'true' current ratings.
+        """
+        # Reset everyone to baseline
+        for name in self.players:
+            self.players[name] = glicko2.Player(rating=750)
+            
+        # Sort history by date so we process matches in order
+        history_df = history_df.sort_values('Date')
+
+        for _, row in history_df.iterrows():
+            # We use the existing logic you already have
+            # but we pass the scores stored in the sheet
+            try:
+                # Convert "11-5 | 11-7" string back to [[11, 5], [11, 7]]
+                parsed = [[int(x.strip()) for x in s.split('-')] for s in row['Score'].split('|')]
+                
+                # Internal update (no saving to cloud inside the loop to save speed)
+                self.update_match_silently(row['Winner'], row['Loser'], parsed, row['Match_Type'])
+            except:
+                continue # Skip malformed rows
+        
+        # Finally, save the new "Corrected" ratings to the cloud
+        self.save_to_cloud()

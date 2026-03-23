@@ -216,6 +216,18 @@ if menu == "ADMIN SETTINGS":
                     st.rerun()
                 else:
                     st.error("Action Required: Provide a name and check the confirmation box.")
+            if is_admin:
+                st.subheader("🔄 Global Recalculation")
+                st.info("This will wipe all current ratings and replay every match in the history to ensure mathematical accuracy.")
+                
+                if st.button("RUN GLOBAL RECALC"):
+                    with st.spinner("Re-simulating season history..."):
+                        # 1. Get fresh history
+                        fresh_h_df = conn.read(worksheet="history", ttl=0)
+                        # 2. Run the rebuild
+                        club.rebuild_ratings(fresh_h_df)
+                        st.success("UTTR System Recalculated.")
+                        st.rerun()
     else:
         st.warning("Admin Key required to access system settings.")
 elif menu == "STANDINGS":
@@ -494,6 +506,7 @@ elif menu == "LOG MATCH":
                 except Exception as e:
                     st.error(f"LOGGING ERROR: {e}. Ensure scores use '-' (e.g., 11-5)")
 elif menu == "PLAYER INTEL":
+    import glicko2 
     st.markdown("#### SUBJECT DOSSIER")
     name = st.selectbox("IDENTIFY", sorted(list(club.players.keys())))
     p = club.players[name]
@@ -503,44 +516,57 @@ elif menu == "PLAYER INTEL":
     with col1:
         st.metric("CURRENT RATING", int(p.rating), delta=f"{int(p.rd)} RD")
         if not h_df.empty:
-            p_matches = h_df[(h_df['Winner'] == name) | (h_df['Loser'] == name)]
-            wins = len(p_matches[p_matches['Winner'] == name])
-            losses = len(p_matches[p_matches['Loser'] == name])
+            # Filter matches for the specific player
+            p_history = h_df[(h_df['Winner'] == name) | (h_df['Loser'] == name)].copy()
+            wins = len(p_history[p_history['Winner'] == name])
+            losses = len(p_history[p_history['Loser'] == name])
+            
             st.write(f"**RECORD:** {wins}W - {losses}L")
             if (wins + losses) > 0:
                 st.write(f"**WIN RATE:** {int((wins/(wins+losses))*100)}%")
 
     with col2:
-        st.caption("RATING PROGRESSION")
-        if not h_df.empty:
-            personal_history = h_df[(h_df['Winner'] == name) | (h_df['Loser'] == name)].copy()
-            
-            current_rating = 750
+        st.caption("OFFICIAL UTTR PROGRESSION")
+        if not h_df.empty and not p_history.empty:
+            # Sort matches by date for the graph
+            p_history = p_history.sort_values('Date') 
+
+            # Initialize a temporary Glicko player to simulate history
+            sim_player = glicko2.Player(rating=750, rd=350, vol=0.06)
             ratings_over_time = []
             
-            for _, row in personal_history.iterrows():
-                # It adds 25 for a win and subtracts 20 for a loss just for the visual
-                if row['Winner'] == name:
-                    current_rating += 25
-                else:
-                    current_rating -= 20
-                ratings_over_time.append(current_rating)
+            for _, row in p_history.iterrows():
+                is_winner = row['Winner'] == name
+                opp_name = row['Loser'] if is_winner else row['Winner']
+                
+                opp_r = club.players[opp_name].rating if opp_name in club.players else 750
+                opp_rd = club.players[opp_name].rd if opp_name in club.players else 350
+                
+                sim_player.update_player([opp_r], [opp_rd], [1 if is_winner else 0])
+                ratings_over_time.append(int(sim_player.rating))
             
-            personal_history['Rating_History'] = ratings_over_time
-            st.line_chart(personal_history.set_index('Date')['Rating_History'])
+            # we calculate the difference and shift the whole line up.
+            current_actual = int(p.rating)
+            if ratings_over_time:
+                diff = current_actual - ratings_over_time[-1]
+                corrected_ratings = [r + diff for r in ratings_over_time]
+            else:
+                corrected_ratings = ratings_over_time
+
+            p_history['UTTR_History'] = corrected_ratings
+            st.line_chart(p_history.set_index('Date')['UTTR_History'])
             st.markdown("---")
-        st.caption("RECENT MATCH HISTORY")
-        if not personal_history.empty:
-            # We reverse it to show the most recent matches at the top
-            display_history = personal_history.sort_index(ascending=False).head(10)
             
-            # Clean up columns for a better look
-            display_history = display_history[['Date', 'Winner', 'Loser', 'Score', 'Match_Type']]
-            
-            st.dataframe(display_history, use_container_width=True, hide_index=True)
+            st.caption("RECENT MATCH HISTORY")
+            # Show last 10 matches, most recent at top
+            display_history = p_history.sort_index(ascending=False).head(10)
+            st.dataframe(
+                display_history[['Date', 'Winner', 'Loser', 'Score', 'Match_Type']], 
+                use_container_width=True, 
+                hide_index=True
+            )
         else:
             st.info("No match data recorded for this subject.")
-            
 
 elif menu == "VERSUS":
     st.markdown("#### MATCHUP ANALYSIS")
