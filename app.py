@@ -586,6 +586,20 @@ elif menu == "HALL OF FAME":
 
 st.markdown('<div class="floating-legend">', unsafe_allow_html=True)
 with st.popover("📜 STATUS KEY"):
-    st.markdown("### UTTR // STATUS EFFECTS")
-    st.markdown("🥇 CHAMP | 😤 DOMINANT | 🔥 ON FIRE | 👑 UNSTOPPABLE | 🧊 COLD | 🛡️ WALL | 💎 VETERAN | 🐣 ROOKIE | 🔨 SLAYER | ❓ UNKNOWN | ⚡ RAID")
+    st.markdown("### UTTR // SYSTEM STATUS DEFINITIONS")
+    st.markdown("""
+    | Status | Requirement | Description |
+    | :--- | :--- | :--- |
+    | 🥇 **CHAMP** | Rank #1 | Current King of the Hill. |
+    | 😤 **DOMINANT** | 3+ Blowouts | Won last 3 matches by a spread of 7+ points. |
+    | 🔥 **ON FIRE** | 3 Match Streak | Momentum is building; high win probability. |
+    | 👑 **UNSTOPPABLE** | 5 Match Streak | Elite consistency; the player to beat. |
+    | 🧊 **COLD** | 3 Loss Streak | Performance dip detected; high volatility. |
+    | 🛡️ **WALL** | RD < 50 | Rating is solidified; very difficult to move. |
+    | 💎 **VETERAN** | 50+ Matches | Long-term data confirmed; highly reliable. |
+    | 🐣 **ROOKIE** | < 5 Matches | Initial calibration phase; low data confidence. |
+    | 🔨 **SLAYER** | Giant Killer | Recently defeated a Top 3 ranked player. |
+    | ❓ **UNKNOWN** | RD > 200 | Inactive or new; rating is highly speculative. |
+    | ⚡ **RAID** | 5/5 Wins | Perfect form in the last 5 recorded matches. |
+    """)
 st.markdown('</div>', unsafe_allow_html=True)
