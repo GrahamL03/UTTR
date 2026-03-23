@@ -119,6 +119,32 @@ class ClubManager:
             "SF": [{"p1": "TBD", "p2": "TBD", "w": None}, {"p1": "TBD", "p2": "TBD", "w": None}],
             "F": {"p1": "TBD", "p2": "TBD", "w": None}
         }
+        
+    def save_to_sheets(self):
+        from streamlit_gsheets import GSheetsConnection
+        import streamlit as st
+        import pandas as pd
+
+        # 1. Establish connection
+        conn = st.connection("gsheets", type=GSheetsConnection)
+
+        # 2. Prepare the data from the internal players dictionary
+        data = []
+        for name, p in self.players.items():
+            data.append({
+                "Name": name,
+                "Rating": p.rating,
+                "RD": p.rd,
+                "Sigma": p.vol,
+                "Wins": p.wins,
+                "Losses": p.losses
+            })
+        
+        # 3. Convert to DataFrame and push to the "players" worksheet
+        df = pd.DataFrame(data)
+        conn.update(worksheet="players", data=df)
+    
+    
     def rebuild_ratings(self, history_df):
         import glicko2
         # 1. Reset everyone to baseline
