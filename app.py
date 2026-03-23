@@ -552,7 +552,7 @@ elif menu == "VERSUS":
     # --- ADJUSTED WIN PROBABILITY FORMULA ---
     # We increase the scale from 400 to 800 to make it less volatile.
     # A gap of 200 pts now looks like a ~64% chance instead of ~76%.
-    scale = 800 
+    scale = 1200 
     prob = 1 / (1 + math.pow(10, ((p2.rating - p1.rating) / scale)))
     
     # Display probability with a clean progress bar
