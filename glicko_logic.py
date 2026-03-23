@@ -161,12 +161,19 @@ class ClubManager:
         for _, row in history_df.iterrows():
             w_name = row['Winner']
             l_name = row['Loser']
+            m_type = row['Match_Type']
+            score_str = row['Score']
             
-            # Ensure players exist in the current session
             if w_name in self.players and l_name in self.players:
-                # We treat every match in history as a "Single" 
-                # unless you want to get complex with scores here
-                self.update_match(w_name, l_name, [[11, 5]], match_type="Single")
+                # NEW LOGIC: Parse the score to see how many games were played
+                # "11-5 | 11-7" becomes [[11, 5], [11, 7]]
+                try:
+                    sets = [[int(x.strip()) for x in s.split('-')] for s in score_str.split('|')]
+                    # Pass the parsed sets and the correct match type
+                    self.update_match(w_name, l_name, sets, match_type=m_type)
+                except:
+                    # Fallback if a score is malformed
+                    self.update_match(w_name, l_name, [[11, 0]], match_type="Single")
 
         # 4. Push the final recalculated numbers back to Google Sheets
         self.save_to_sheets()
