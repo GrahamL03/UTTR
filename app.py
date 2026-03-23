@@ -324,28 +324,33 @@ elif menu == "STANDINGS":
     else:
         st.info("No matches have been played yet. Record a match to generate the standings!")
 
-    # --- CLUSTERED RATING DISTRIBUTION ---
+# --- CLUSTERED RATING DISTRIBUTION ---
+    import altair as alt # Add this at the top of your script if you prefer
     st.markdown("---")
     st.caption("LEAGUE RATING DISTRIBUTION (250pt TIERS)")
     
-    # Update this to only chart players who are actively displayed on the board
     all_ratings = [row['RATING'] for row in players_data]
     
     if all_ratings:
         df_dist = pd.DataFrame(all_ratings, columns=['Rating'])
         
-        # Cluster into 250-point buckets
-        df_dist['Tier'] = (df_dist['Rating'] // 250) * 250
+        # 1. Create the Tier number (The math: 1100 // 250 = 4; 4 * 250 = 1000)
+        df_dist['Tier_Start'] = (df_dist['Rating'] // 250) * 250
         
-        # Create the label (e.g., 1000-1249)
-        df_dist['Range'] = df_dist['Tier'].apply(lambda x: f"{int(x)}-{int(x+249)}")
+        # 2. Count players per tier
+        dist_counts = df_dist.groupby('Tier_Start').size().reset_index(name='Players')
         
-        # Count players per tier and sort numerically
-        dist_counts = df_dist.groupby(['Tier', 'Range']).size().reset_index(name='Players')
-        dist_counts = dist_counts.sort_values('Tier')
-        
-        # Render the chart
-        st.bar_chart(dist_counts.set_index('Range')['Players'])
+        # 3. Create the text label for the X-axis
+        dist_counts['Range'] = dist_counts['Tier_Start'].apply(lambda x: f"{int(x)}-{int(x)+249}")
+
+        # 4. Use Altair to force the sort by 'Tier_Start' (the number) instead of 'Range' (the text)
+        chart = alt.Chart(dist_counts).mark_bar(color='#58a6ff').encode(
+            x=alt.X('Range:N', sort=alt.SortField(field='Tier_Start', order='ascending'), title="Rating Bracket"),
+            y=alt.Y('Players:Q', title="Number of Players"),
+            tooltip=['Range', 'Players']
+        ).properties(height=300)
+
+        st.altair_chart(chart, use_container_width=True)
 elif menu == "TOURNAMENT":
     st.markdown("#### 🏆 BRACKET CONTROL")
     if st.session_state.bracket is None:
